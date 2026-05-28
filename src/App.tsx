@@ -32,6 +32,7 @@ import {
 import { ClothesItem, SaleLog, SystemSettings, SizesMap } from './types';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
+import logoUrl from './logo.svg';
 
 // Helper to sum stock sizes cleanly and prevent aggregate type warnings
 function sumStock(sizes: SizesMap): number {
@@ -217,7 +218,7 @@ export default function App() {
         }
       } else {
         const defaultSet: SystemSettings = {
-          customLogoUrl: "https://torah-supporters-logo-q6t8y35io-aliko-s-projects.vercel.app/",
+          customLogoUrl: logoUrl,
           managerEmail: "shey7048@gmail.com",
           lowStockAlertActive: true,
           alertEmailSentFor: [],
@@ -991,7 +992,7 @@ export default function App() {
   const totalAccumulatedProfit = salesLogs.reduce((sum, log) => sum + log.profit, 0);
 
   // Logo fallback handler
-  const activeLogoUrl = settings.customLogoUrl || "https://torah-supporters-logo-q6t8y35io-aliko-s-projects.vercel.app/";
+  const activeLogoUrl = settings.customLogoUrl || logoUrl;
 
   // RENDER INTERFACE
   if (!isAuthenticated) {
@@ -1426,7 +1427,7 @@ export default function App() {
                     onClick={() => setIsCategoryModalOpen(true)}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all duration-200 flex items-center gap-2 text-xs border border-slate-200/50"
                   >
-                    <Layers className="h-4 w-4 text-slate-550" />
+                    <Layers className="h-4 w-4 text-slate-600" />
                     <span>ניהול קטגוריות</span>
                   </button>
                 </div>
@@ -1469,7 +1470,8 @@ export default function App() {
                 const isOutOfStock = totalStock === 0;
                 const isLowStock = totalStock <= item.minStock;
 
-                const defaultPlaceholder = `https://placehold.co/400x400/0284c7/ffffff?text=${encodeURIComponent(item.name.split(' ')[0] || 'בגד')}`;
+                const defaultPlaceholder = logoUrl;
+                const isNoImage = !item.imageUrl;
                 const previewImgSource = item.imageUrl || defaultPlaceholder;
 
                 return (
@@ -1480,9 +1482,10 @@ export default function App() {
                       <img 
                         src={previewImgSource} 
                         alt={item.name} 
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${isNoImage ? 'object-contain p-6 bg-slate-50' : 'object-cover'}`}
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = defaultPlaceholder;
+                          (e.target as HTMLImageElement).className = "w-full h-full object-contain p-6 bg-slate-50 transition-transform duration-500 group-hover:scale-105";
                         }}
                       />
                       
@@ -1738,7 +1741,7 @@ export default function App() {
                         className="h-10 object-contain bg-slate-50 p-1 rounded border border-slate-100 max-w-[120px]" 
                         onError={(e) => {
                           // Fallback if preview fails
-                          (e.target as any).src = "https://torah-supporters-logo-q6t8y35io-aliko-s-projects.vercel.app/";
+                          (e.target as any).src = logoUrl;
                         }}
                       />
                       <div className="flex-1 min-w-0">
