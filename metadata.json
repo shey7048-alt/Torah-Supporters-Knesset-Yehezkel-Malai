@@ -1,0 +1,6 @@
+{
+  "name": "חדר מכירות ת״ת כנסת יחזקאל - ממשק ניהול",
+  "description": "ממשק ניהול מלאי מתקדם, יומן מכירות ורווחים מצטברים, פאנל התראות חוסר במלאי ושילוח דוא״ל אל סגל תמיכת התורה כנסת יחזקאל.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

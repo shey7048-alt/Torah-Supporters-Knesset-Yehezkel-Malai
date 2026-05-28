@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "ClothesItem": {
+      "title": "ClothesItem",
+      "description": "Represents an inventory clothing pattern or item in Knesset Yechezkel Clothing Sales Room.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the clothing item model." },
+        "name": { "type": "string", "description": "Name or title of clothing item." },
+        "sku": { "type": "string", "description": "SKU identifier or product barcode." },
+        "category": { "type": "string", "description": "Category of the garment (e.g. Shirts, Pants)." },
+        "color": { "type": "string", "description": "Garment color." },
+        "costPrice": { "type": "number", "description": "Wholesale supplier cost price in ILS." },
+        "sellPrice": { "type": "number", "description": "Consumer sale price to students in ILS." },
+        "minStock": { "type": "number", "description": "Threshold trigger level to send email alerts." },
+        "imageUrl": { "type": "string", "description": "Base64 or external URL of clothing image preview." },
+        "sizes": { "type": "object", "description": "Map representing size elements as keys and stock count as values." },
+        "dateAdded": { "type": "string", "format": "date-time", "description": "Creation timestamp." }
+      },
+      "required": ["id", "name", "sku", "category", "color", "costPrice", "sellPrice", "minStock", "sizes"]
+    },
+    "SaleLog": {
+      "title": "SaleLog",
+      "description": "Tracks historic sales and stock movements for profit calculation and auditing.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "sku": { "type": "string" },
+        "size": { "type": "string" },
+        "qty": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "sellPrice": { "type": "number" },
+        "profit": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "itemId", "itemName", "sku", "size", "qty", "costPrice", "sellPrice", "profit", "timestamp"]
+    },
+    "SystemSettings": {
+      "title": "SystemSettings",
+      "description": "Global customization parameters for branding and low-stock email triggers.",
+      "type": "object",
+      "properties": {
+        "customLogoUrl": { "type": "string" },
+        "managerEmail": { "type": "string" },
+        "lowStockAlertActive": { "type": "boolean" },
+        "alertEmailSentFor": { "type": "array" }
+      },
+      "required": ["customLogoUrl", "managerEmail", "lowStockAlertActive", "alertEmailSentFor"]
+    }
+  },
+  "firestore": {
+    "/items/{itemId}": {
+      "schema": "ClothesItem",
+      "description": "Main garment catalog inventory collection."
+    },
+    "/sales/{saleId}": {
+      "schema": "SaleLog",
+      "description": "Transaction logs collection."
+    },
+    "/settings/config": {
+      "schema": "SystemSettings",
+      "description": "Configuration document for alert parameters and customization."
+    }
+  }
+}

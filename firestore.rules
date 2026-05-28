@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Schema validation helpers
+
+    function isValidClothesItem(data) {
+      return data.keys().hasAll(['id', 'name', 'sku', 'category', 'color', 'costPrice', 'sellPrice', 'minStock', 'sizes'])
+        && data.keys().size() <= 15
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 200
+        && data.sku is string && data.sku.size() <= 100
+        && data.category is string && data.category.size() <= 100
+        && data.color is string && data.color.size() <= 100
+        && data.costPrice is number && data.costPrice >= 0
+        && data.sellPrice is number && data.sellPrice >= 0
+        && data.minStock is number && data.minStock >= 0
+        && data.sizes is map;
+    }
+
+    function isValidSaleLog(data) {
+      return data.keys().hasAll(['id', 'itemId', 'itemName', 'sku', 'size', 'qty', 'costPrice', 'sellPrice', 'profit', 'timestamp'])
+        && data.keys().size() <= 12
+        && data.id is string && data.id.size() <= 128
+        && data.itemId is string && data.itemId.size() <= 128
+        && data.itemName is string && data.itemName.size() <= 200
+        && data.sku is string && data.sku.size() <= 100
+        && data.size is string && data.size.size() <= 50
+        && data.qty is number && data.qty >= 0
+        && data.costPrice is number && data.costPrice >= 0
+        && data.sellPrice is number && data.sellPrice >= 0
+        && data.profit is number;
+    }
+
+    function isValidSystemSettings(data) {
+      return data.keys().hasAll(['customLogoUrl', 'managerEmail', 'lowStockAlertActive', 'alertEmailSentFor'])
+        && data.keys().size() <= 6
+        && data.customLogoUrl is string && data.customLogoUrl.size() <= 1000
+        && data.managerEmail is string && data.managerEmail.size() <= 200
+        && data.lowStockAlertActive is bool
+        && data.alertEmailSentFor is list;
+    }
+
+    // ---------- COLLECTION RULE SETS ----------
+
+    match /items/{itemId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(itemId) && isValidClothesItem(incoming());
+      allow update: if isSignedIn() && isValidId(itemId) && isValidClothesItem(incoming());
+      allow delete: if isSignedIn() && isValidId(itemId);
+    }
+
+    match /sales/{saleId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(saleId) && isValidSaleLog(incoming());
+      allow update: if isSignedIn() && isValidId(saleId) && isValidSaleLog(incoming());
+      allow delete: if isSignedIn() && isValidId(saleId);
+    }
+
+    match /settings/{configDoc} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && configDoc == 'config' && isValidSystemSettings(incoming());
+      allow delete: if false;
+    }
+  }
+}
