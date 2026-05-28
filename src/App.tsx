@@ -32,7 +32,8 @@ import {
 import { ClothesItem, SaleLog, SystemSettings, SizesMap } from './types';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
-import logoUrl from './logo.svg';
+
+const logoUrl = "https://raw.githubusercontent.com/shey7048-alt/Torah-Supporters-Logo/refs/heads/main/%D7%9C%D7%95%D7%92%D7%95%20%D7%AA%D7%AA%20%D7%94%D7%93%D7%A9image%20(13).png";
 
 // Helper to sum stock sizes cleanly and prevent aggregate type warnings
 function sumStock(sizes: SizesMap): number {
@@ -1475,35 +1476,35 @@ export default function App() {
                 const previewImgSource = item.imageUrl || defaultPlaceholder;
 
                 return (
-                  <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all duration-200 hover:shadow-lg group">
+                  <div key={item.id} className="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(148,163,184,0.12)] hover:shadow-[0_12px_30px_-4px_rgba(148,163,184,0.2)] transition-all duration-300 hover:-translate-y-1 flex flex-col overflow-hidden relative group">
                     
                     {/* Upper image and metadata badge */}
-                    <div className="h-48 bg-slate-50 relative overflow-hidden flex items-center justify-center border-b border-slate-100">
+                    <div className="h-52 bg-slate-50 relative overflow-hidden flex items-center justify-center border-b border-slate-100">
                       <img 
                         src={previewImgSource} 
                         alt={item.name} 
-                        className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${isNoImage ? 'object-contain p-6 bg-slate-50' : 'object-cover'}`}
+                        className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${isNoImage ? 'object-contain p-8 bg-slate-50' : 'object-cover'}`}
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = defaultPlaceholder;
-                          (e.target as HTMLImageElement).className = "w-full h-full object-contain p-6 bg-slate-50 transition-transform duration-500 group-hover:scale-105";
+                          (e.target as HTMLImageElement).className = "w-full h-full object-contain p-8 bg-slate-50 transition-transform duration-500 group-hover:scale-105";
                         }}
                       />
                       
-                      <span className="absolute top-3 right-3 bg-slate-900/75 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-xs font-black tracking-wide">
+                      <span className="absolute top-3 right-3 bg-white/95 backdrop-blur-md text-slate-700 px-3 py-1 rounded-xl text-xs font-bold shadow-sm border border-slate-200/40">
                         {item.category}
                       </span>
 
                       <div className="absolute top-3 left-3">
                         {isOutOfStock ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200 flex items-center gap-1">
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50/95 text-rose-700 border border-rose-100 shadow-sm flex items-center gap-1">
                             מלאי אזל
                           </span>
                         ) : isLowStock ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200 flex items-center gap-1">
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50/95 text-amber-700 border border-amber-200 shadow-sm flex items-center gap-1">
                             מלאי נמוך
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50/95 text-emerald-700 border border-emerald-100 shadow-sm flex items-center gap-1">
                             תקין במלאי
                           </span>
                         )}
@@ -1514,49 +1515,49 @@ export default function App() {
                     <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                       
                       <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-400 font-mono">מק"ט: {item.sku}</span>
-                          <span className="text-xs font-semibold text-slate-400">צבע: {item.color}</span>
+                        <div className="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                          <span className="font-mono bg-slate-100 px-2 py-0.5 rounded-md text-[10px] text-slate-500">מק"ט: {item.sku}</span>
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-md text-[10px] text-slate-500">צבע: {item.color}</span>
                         </div>
-                        <h4 className="text-lg font-bold text-slate-800 mt-1 line-clamp-1">{item.name}</h4>
+                        <h4 className="text-base font-extrabold text-slate-800 line-clamp-2 mt-2 group-hover:text-blue-600 transition-colors" title={item.name}>{item.name}</h4>
 
-                        {/* Financial and pricing rows */}
-                        <div className="flex items-center gap-3 mt-2 text-sm bg-slate-50 p-2 rounded-xl border border-slate-100">
-                          <div className="text-slate-550">
-                            <span className="text-[10px] block text-slate-400 leading-none">עלות ספק:</span>
-                            <span className="font-extrabold text-slate-800">₪{item.costPrice}</span>
+                        {/* Financial and pricing rows (Ultra professional micro-dashboard styling) */}
+                        <div className="grid grid-cols-3 gap-1 bg-slate-50/70 p-3 rounded-xl border border-slate-100/80 text-center mt-3">
+                          <div className="flex flex-col justify-center">
+                            <span className="text-[10px] text-slate-400 font-medium leading-none mb-1">עלות רכש</span>
+                            <span className="text-xs font-bold text-slate-700">₪{item.costPrice}</span>
                           </div>
-                          <div className="h-4 w-px bg-slate-200"></div>
-                          <div className="text-slate-550">
-                            <span className="text-[10px] block text-slate-400 leading-none">רווח צרכן:</span>
-                            <span className="font-extrabold text-blue-600">₪{item.sellPrice}</span>
+                          <div className="border-r border-slate-200/60 flex flex-col justify-center">
+                            <span className="text-[10px] text-slate-400 font-medium leading-none mb-1">מחיר צרכן</span>
+                            <span className="text-xs font-black text-blue-600">₪{item.sellPrice}</span>
                           </div>
-                          <div className="h-4 w-px bg-slate-200"></div>
-                          <div className="text-slate-550">
-                            <span className="text-[10px] block text-slate-400 leading-none">רווח נקי:</span>
-                            <span className="font-bold text-emerald-600">₪{item.sellPrice - item.costPrice}</span>
+                          <div className="border-r border-slate-200/60 flex flex-col justify-center">
+                            <span className="text-[10px] text-slate-400 font-medium leading-none mb-1">רווח נקי</span>
+                            <span className="text-xs font-black text-emerald-600">₪{item.sellPrice - item.costPrice}</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Interactive size matrix */}
-                      <div className="border-t border-b border-slate-100 py-3">
-                        <span className="text-[11px] font-bold text-slate-400 block mb-2">ניהול מהיר של יחידות מלאי:</span>
-                        <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-0.5">
+                      <div className="border-t border-b border-dashed border-slate-200/80 py-3.5">
+                        <span className="text-[11px] font-bold text-slate-400 block mb-2 text-right">מלאי ועדכון מהיר לפי מידה:</span>
+                        <div className="grid grid-cols-4 gap-2 max-h-44 overflow-y-auto pr-0.5 lg:grid-cols-4">
                           {(Object.entries(item.sizes) as [string, number][]).map(([szName, qty]) => (
-                            <div key={szName} className="border border-slate-100 rounded-lg p-1.5 flex flex-col items-center justify-between bg-slate-50 hover:bg-white transiton-colors">
-                              <span className="text-[10px] font-extrabold text-slate-400 block text-center truncate w-full">{szName}</span>
-                              <span className={`text-sm font-black my-0.5 ${qty === 0 ? 'text-red-500' : qty <= 2 ? 'text-amber-500' : 'text-slate-800'}`}>{qty}</span>
-                              <div className="flex gap-1 mt-1">
+                            <div key={szName} className="border border-slate-100 rounded-xl p-2 flex flex-col items-center justify-between bg-white shadow-sm hover:border-blue-200 transition-all duration-150 group/size relative">
+                              <span className="text-[10px] font-bold text-slate-400 block text-center truncate w-full" title={szName}>{szName}</span>
+                              <span className={`text-xs font-black my-1 ${qty === 0 ? 'text-rose-500' : qty <= 2 ? 'text-amber-500 font-black' : 'text-slate-800'}`}>{qty} יח'</span>
+                              <div className="flex gap-1 w-full justify-center">
                                 <button 
                                   onClick={() => handleQuickStockChange(item, szName, -1)}
-                                  className="w-5 h-5 bg-white border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-500 rounded flex items-center justify-center text-xs font-bold cursor-pointer"
+                                  className="w-5 h-5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 text-slate-500 hover:text-rose-600 rounded-md flex items-center justify-center text-xs font-extrabold cursor-pointer transition-all duration-100 active:scale-90"
+                                  title="הפחת 1 יח'"
                                 >
                                   -
                                 </button>
                                 <button 
                                   onClick={() => handleQuickStockChange(item, szName, 1)}
-                                  className="w-5 h-5 bg-white border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-500 rounded flex items-center justify-center text-xs font-bold cursor-pointer"
+                                  className="w-5 h-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200/60 text-slate-500 hover:text-emerald-600 rounded-md flex items-center justify-center text-xs font-extrabold cursor-pointer transition-all duration-100 active:scale-90"
+                                  title="הוסף 1 יח'"
                                 >
                                   +
                                 </button>
@@ -1569,8 +1570,8 @@ export default function App() {
                       {/* Card lower interactions */}
                       <div className="flex items-center justify-between pt-1">
                         <div>
-                          <span className="text-xs font-semibold text-slate-400 block leading-tight">סה"כ במחסן:</span>
-                          <span className="text-lg font-black text-slate-800 leading-none">
+                          <span className="text-[10px] font-medium text-slate-400 block leading-tight">סה"כ במלאי:</span>
+                          <span className="text-base font-black text-slate-800 leading-none">
                             {totalStock} <span className="text-xs font-bold text-slate-500">יח'</span>
                           </span>
                         </div>
@@ -1578,17 +1579,17 @@ export default function App() {
                         <div className="flex gap-1.5">
                           <button
                             onClick={() => openItemModal(item)}
-                            className="w-8 h-8 rounded-lg bg-slate-50 text-slate-500 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-all cursor-pointer border border-slate-100"
-                            title="ערוך דגם"
+                            className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-all cursor-pointer border border-slate-200/60 hover:border-blue-200 shadow-sm"
+                            title="עריכת דגם"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteItem(item.id, item.name)}
-                            className="w-8 h-8 rounded-lg bg-slate-50 text-slate-500 hover:text-red-650 hover:bg-red-50 flex items-center justify-center transition-all cursor-pointer border border-slate-100"
-                            title="מחק דגם"
+                            className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-all cursor-pointer border border-slate-200/60 hover:border-red-200 shadow-sm"
+                            title="מחיקת דגם"
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
