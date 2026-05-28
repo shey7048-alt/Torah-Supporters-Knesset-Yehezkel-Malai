@@ -4,7 +4,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -12,14 +12,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth();
 
-// Sign in anonymously immediately to authenticate the client session
-signInAnonymously(auth)
-  .then(() => {
-    console.log('Firebase Anonymous Authentication succeeded');
-  })
-  .catch((error) => {
-    console.error('Firebase Anonymous Auth failed:', error);
-  });
+// Credentials or Auth session can be managed if custom authentication is requested
 
 // Validate connection to Firestore as required by the Skill instructions
 async function testConnection() {

@@ -310,21 +310,49 @@ export default function App() {
     }
   };
 
-  // Image upload base64 encoding
+  // Image upload base64 encoding with canvas compression to ensure it stays well below Firestore's 1MB limit
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2.2 * 1024 * 1024) {
-      triggerToast('התמונה גדולה מדי. אנא העלה תמונה קטנה מ-2MB.', 'error');
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          setFormImage(dataUrl);
+          triggerToast('התמונה הועלתה והותאמה בהצלחה לתצוגה מקדימה!', 'success');
+        } else {
+          // Fallback if canvas ctx fails
+          setFormImage(img.src);
+          triggerToast('התמונה הועלתה בהצלחה לתצוגה מקדימה!', 'success');
+        }
+      };
       if (event.target?.result) {
-        setFormImage(event.target.result as string);
-        triggerToast('התמונה הועלתה בהצלחה לתצוגה מקדימה!', 'success');
+        img.src = event.target.result as string;
       }
     };
     reader.readAsDataURL(file);
