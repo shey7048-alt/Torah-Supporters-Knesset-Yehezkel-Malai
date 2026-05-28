@@ -239,6 +239,102 @@ app.post('/api/send-alert', async (req, res) => {
   }
 });
 
+// Expose verification codes in-memory store
+const verificationCodes = new Map<string, { code: string; expiresAt: number }>();
+
+// Endpoint to send a 6-digit OTP code to the requested email
+app.post('/api/send-auth-code', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'כתובת דייר לקבלת קוד נדרשת' });
+  }
+
+  // Generate 6-digit random code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+
+  verificationCodes.set(email.toLowerCase().trim(), { code, expiresAt });
+
+  try {
+    const transporter = getMailTransporter();
+    const subject = `🔑 קוד חד-פעמי לכניסה למערכת: ${code}`;
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html lang="he" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; background-color: #f8fafc; color: #1e293b; padding: 20px; }
+          .card { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+          .header { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; padding: 20px; text-align: center; }
+          .header h1 { margin: 0; font-size: 20px; font-weight: 800; }
+          .content { padding: 30px; text-align: center; }
+          .code-box { display: inline-block; font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 4px; background: #f1f5f9; padding: 12px 24px; border-radius: 12px; color: #0284c7; border: 2px dashed #0284c7; margin: 20px 0; }
+          .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="header">
+            <h1>מערכת ניהול מלאי כנסת יחזקאל</h1>
+          </div>
+          <div class="content">
+            <p>שלום,</p>
+            <p>התקבל קוד כניסה חד-פעמי (OTP) עבור דוא"ל זה. אנא הקלד את הקוד הבא בממשק הניהול כדי להתחבר:</p>
+            <div class="code-box">${code}</div>
+            <p style="font-size: 12px; color: #64748b;">הקוד בתוקף למשך 10 דקות בלבד.</p>
+          </div>
+          <div class="footer">
+            נשלח באופן אוטומטי ממערכת ניהול המלאי של ת"ת כנסת יחזקאל
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await transporter.sendMail({
+      from: `"ניהול מלאי כנסת יחזקאל" <${process.env.EMAIL_USER || 'no-reply@knesset-yechezkel.org'}>`,
+      to: email,
+      subject,
+      html: emailHtml,
+      text: `קוד האימות שלך לכניסה למערכת הוא: ${code}. הקוד בתוקף ל-10 דקות.`
+    });
+
+    res.json({ success: true, message: 'קוד אימות נשלח בהצלחה לכתובת המייל!' });
+  } catch (err) {
+    console.error("Failed to dispatcher OTP validation mail:", err);
+    res.status(500).json({ error: 'שגיאה בשליחת המייל. ודא כי פרטי ה-SMTP מוגדרים כראוי.' });
+  }
+});
+
+// Endpoint to verify the 6-digit OTP code requested by the client
+app.post('/api/verify-auth-code', async (req, res) => {
+  const { email, code } = req.body;
+  if (!email || !code) {
+    return res.status(400).json({ error: 'נדרש כתובת אימייל וקוד אימות' });
+  }
+
+  const key = email.toLowerCase().trim();
+  const record = verificationCodes.get(key);
+
+  if (!record) {
+    return res.status(400).json({ error: 'קוד אימות לא נמצא או פקע תוקפו. אנא שלח קוד חדש.' });
+  }
+
+  if (Date.now() > record.expiresAt) {
+    verificationCodes.delete(key);
+    return res.status(400).json({ error: 'קוד האימות פג תוקפו. אנא שלח קוד חדש.' });
+  }
+
+  if (record.code !== code.trim()) {
+    return res.status(400).json({ error: 'קוד אימות שגוי. אנא נסה שוב.' });
+  }
+
+  // Succeeded! Clean up key state
+  verificationCodes.delete(key);
+  res.json({ success: true, message: 'אימות הושלם בהצלחה!' });
+});
+
 
 // ---------------- DYNAMIC VITE FRONTEND MIDDLEWARE ----------------
 

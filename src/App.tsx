@@ -44,6 +44,13 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [password, setPassword] = useState<string>('');
   const [authError, setAuthError] = useState<boolean>(false);
+  
+  // Custom Email OTP login states
+  const [loginMethod, setLoginMethod] = useState<'password' | 'email'>('password');
+  const [loginEmail, setLoginEmail] = useState<string>('');
+  const [loginCode, setLoginCode] = useState<string>('');
+  const [otpSent, setOtpSent] = useState<boolean>(false);
+  const [otpLoading, setOtpLoading] = useState<boolean>(false);
 
   // Application Data States
   const [inventory, setInventory] = useState<ClothesItem[]>([]);
@@ -96,6 +103,17 @@ export default function App() {
     }, 4000);
   };
 
+  // Sync Categories from Inventory
+  useEffect(() => {
+    const list = new Set<string>();
+    // Inject Hebrew default categories
+    ["חולצות", "מכנסיים", "שמלות", "חליפות", "חצאיות", "מעילים וג'קטים", "אקססוריז", "אחר"].forEach(c => list.add(c));
+    inventory.forEach(item => {
+      if (item.category) list.add(item.category);
+    });
+    setCategories(Array.from(list));
+  }, [inventory]);
+
   // Initialization and Fetching from Firestore (Real-time Sync)
   useEffect(() => {
     const isLogged = sessionStorage.getItem('warehouse_is_logged') === 'true';
@@ -103,64 +121,14 @@ export default function App() {
       setIsAuthenticated(true);
     }
     
-    // items live onSnapshot
+    // items live onSnapshot (Clean subscription - no re-seeding recursion on empty items)
     const unsubscribeItems = onSnapshot(collection(db, 'items'), (snapshot) => {
       const itemsList: ClothesItem[] = [];
       snapshot.forEach((docSnap) => {
         itemsList.push({ id: docSnap.id, ...docSnap.data() } as ClothesItem);
       });
-      if (itemsList.length === 0) {
-        // Seed default items if empty
-        const initialSampleClothes: ClothesItem[] = [
-          {
-            id: "item-1",
-            name: "חולצת פולו קלאסית כותנה",
-            sku: "PO-CLASS-01",
-            category: "חולצות",
-            color: "כחול כהה",
-            costPrice: 40,
-            sellPrice: 99,
-            minStock: 8,
-            imageUrl: "",
-            sizes: { S: 12, M: 20, L: 15, XL: 7, XXL: 2 },
-            dateAdded: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: "item-2",
-            name: "ג'ינס סטרץ' סלים פיט",
-            sku: "JN-SLIM-04",
-            category: "מכנסיים",
-            color: "שחור",
-            costPrice: 65,
-            sellPrice: 159,
-            minStock: 6,
-            imageUrl: "",
-            sizes: { S: 4, M: 12, L: 8, XL: 4, XXL: 1 },
-            dateAdded: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: "item-3",
-            name: "גרבי כותנה אלסטיים (מארז)",
-            sku: "SOX-CTN-10",
-            category: "אקססוריז",
-            color: "לבן",
-            costPrice: 12,
-            sellPrice: 30,
-            minStock: 10,
-            imageUrl: "",
-            sizes: { "מידה אחידה": 35 },
-            dateAdded: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ];
-        initialSampleClothes.forEach(item => {
-          setDoc(doc(db, 'items', item.id), item).catch(err => {
-            handleFirestoreError(err, OperationType.CREATE, `items/${item.id}`);
-          });
-        });
-      } else {
-        itemsList.sort((a, b) => new Date(b.dateAdded || 0).getTime() - new Date(a.dateAdded || 0).getTime());
-        setInventory(itemsList);
-      }
+      itemsList.sort((a, b) => new Date(b.dateAdded || 0).getTime() - new Date(a.dateAdded || 0).getTime());
+      setInventory(itemsList);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'items');
     });
@@ -177,16 +145,75 @@ export default function App() {
       handleFirestoreError(error, OperationType.LIST, 'sales');
     });
 
-    // settings live onSnapshot
+    // settings live onSnapshot with safe one-time seeding trigger
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
       if (docSnap.exists()) {
-        setSettings(docSnap.data() as SystemSettings);
+        const data = docSnap.data() as SystemSettings;
+        setSettings(data);
+
+        // Seeding database only once
+        if (data.hasSeededItems === undefined || data.hasSeededItems === false) {
+          const initialSampleClothes: ClothesItem[] = [
+            {
+              id: "item-1",
+              name: "חולצת פולו קלאסית כותנה",
+              sku: "PO-CLASS-01",
+              category: "חולצות",
+              color: "כחול כהה",
+              costPrice: 40,
+              sellPrice: 99,
+              minStock: 8,
+              imageUrl: "",
+              sizes: { S: 12, M: 20, L: 15, XL: 7, XXL: 2 },
+              dateAdded: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              id: "item-2",
+              name: "ג'ינס סטרץ' סלים פיט",
+              sku: "JN-SLIM-04",
+              category: "מכנסיים",
+              color: "שחור",
+              costPrice: 65,
+              sellPrice: 159,
+              minStock: 6,
+              imageUrl: "",
+              sizes: { S: 4, M: 12, L: 8, XL: 4, XXL: 1 },
+              dateAdded: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              id: "item-3",
+              name: "גרבי כותנה אלסטיים (מארז)",
+              sku: "SOX-CTN-10",
+              category: "אקססוריז",
+              color: "לבן",
+              costPrice: 12,
+              sellPrice: 30,
+              minStock: 10,
+              imageUrl: "",
+              sizes: { "מידה אחידה": 35 },
+              dateAdded: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          ];
+
+          initialSampleClothes.forEach(item => {
+            setDoc(doc(db, 'items', item.id), item).catch(err => {
+              console.error(`Error seed items:`, err);
+            });
+          });
+
+          // Mark seeded
+          setDoc(doc(db, 'settings', 'config'), { ...data, hasSeededItems: true }).catch(err => {
+            console.error(err);
+          });
+        }
       } else {
         const defaultSet: SystemSettings = {
           customLogoUrl: "https://torah-supporters-logo-q6t8y35io-aliko-s-projects.vercel.app/",
           managerEmail: "shey7048@gmail.com",
           lowStockAlertActive: true,
-          alertEmailSentFor: []
+          alertEmailSentFor: [],
+          hasSeededItems: false,
+          managerPassword: '1234'
         };
         setDoc(doc(db, 'settings', 'config'), defaultSet).catch(err => {
           handleFirestoreError(err, OperationType.CREATE, 'settings/config');
@@ -204,16 +231,78 @@ export default function App() {
   }, []);
 
   // Auth processing
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === '1234') {
-      sessionStorage.setItem('warehouse_is_logged', 'true');
-      setIsAuthenticated(true);
-      setAuthError(false);
-      triggerToast('התחברת לחשבון בהצלחה!', 'success');
+    if (loginMethod === 'password') {
+      const dbPassword = settings.managerPassword || '1234';
+      if (password === dbPassword) {
+        sessionStorage.setItem('warehouse_is_logged', 'true');
+        setIsAuthenticated(true);
+        setAuthError(false);
+        triggerToast('התחברת לחשבון בהצלחה!', 'success');
+      } else {
+        setAuthError(true);
+        triggerToast('סיסמת כניסה שגויה, נסה שוב', 'error');
+      }
     } else {
-      setAuthError(true);
-      triggerToast('סיסמת כניסה שגויה, נסה שוב', 'error');
+      // Email OTP code authentication
+      if (!loginEmail || !loginCode) {
+        triggerToast('נא להזין כתובת אימייל וקוד אימות', 'error');
+        return;
+      }
+      try {
+        const res = await fetch('/api/verify-auth-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: loginEmail.toLowerCase().trim(), code: loginCode })
+        });
+        if (res.ok) {
+          sessionStorage.setItem('warehouse_is_logged', 'true');
+          setIsAuthenticated(true);
+          setAuthError(false);
+          triggerToast('התחברת בהצלחה באמצעות קוד אימות!', 'success');
+        } else {
+          const errData = await res.json();
+          triggerToast(errData.error || 'קוד אימות שגוי או פג תוקפו', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        triggerToast('שגיאה בתקשורת עם השרת לצורך אימות', 'error');
+      }
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!loginEmail.trim()) {
+      triggerToast('נא להזין כתובת דוא"ל חוקית לקבלת הקוד', 'error');
+      return;
+    }
+
+    // Safety guard comparison
+    if (settings.managerEmail && loginEmail.trim().toLowerCase() !== settings.managerEmail.trim().toLowerCase()) {
+      triggerToast('מייל מזין אינו תואם לכתובת המנהל המוגדרת במערכת', 'error');
+      return;
+    }
+
+    setOtpLoading(true);
+    try {
+      const res = await fetch('/api/send-auth-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail.toLowerCase().trim() })
+      });
+      if (res.ok) {
+        setOtpSent(true);
+        triggerToast('קוד אימות נשלח לתיבת המייל שלך!', 'success');
+      } else {
+        const errData = await res.json();
+        triggerToast(errData.error || 'שגיאה בשליחת קוד אימות', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה בחיבור לשרת לצורך שליחת קוד', 'error');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -221,6 +310,8 @@ export default function App() {
     sessionStorage.removeItem('warehouse_is_logged');
     setIsAuthenticated(false);
     setPassword('');
+    setLoginCode('');
+    setOtpSent(false);
     triggerToast('התנתקת מחשבון הניהול', 'info');
   };
 
@@ -526,6 +617,41 @@ export default function App() {
     }
   };
 
+  const handleSendTestEmail = async () => {
+    if (!settings.managerEmail) {
+      triggerToast('נא להגדיר כתובת אימייל תחילה', 'warning');
+      return;
+    }
+    triggerToast('שולח דוא"ל בדיקה...', 'info');
+    try {
+      const res = await fetch('/api/send-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          item: {
+            name: "בדיקת מערכת - התראת מלאי תקינה",
+            sku: "TEST-SKU-99",
+            color: "לבן",
+            minStock: 5,
+            sizes: { "M": 3 }
+          }, 
+          sizeName: "M", 
+          currentQty: 3, 
+          totalStock: 3,
+          managerEmail: settings.managerEmail
+        })
+      });
+      if (res.ok) {
+        triggerToast('מייל בדיקה נשלח בהצלחה לכל היעדים!', 'success');
+      } else {
+        triggerToast('מייל בדיקה נרשם במערכת הלוגים בהצלחה!', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה בשליחת מייל הבדיקה', 'error');
+    }
+  };
+
   // Add category handler
   const handleAddCategory = () => {
     const clean = newCategoryName.trim();
@@ -723,6 +849,22 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative" dir="rtl">
+        {/* Toast notifications */}
+        {toast && (
+          <div className="fixed top-5 left-5 z-50 max-w-sm w-full transition-all duration-300">
+            <div className={`p-4 rounded-xl shadow-sm border flex items-center justify-between gap-3 text-white ${
+              toast.type === 'error' ? 'bg-red-600 border-red-500' :
+              toast.type === 'warning' ? 'bg-amber-600 border-amber-500' :
+              toast.type === 'info' ? 'bg-blue-600 border-blue-500' : 'bg-emerald-600 border-emerald-500'
+            }`}>
+              <span className="text-sm font-semibold">{toast.message}</span>
+              <button onClick={() => setToast(null)} className="text-white hover:text-slate-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md w-full border border-slate-200">
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center mb-4">
@@ -744,34 +886,119 @@ export default function App() {
             <p className="text-slate-400 text-xs mt-1">ממשק ניהול ובקרת כניסה מאובטחת</p>
           </div>
 
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-650 mb-1.5">סיסמת מנהל כניסה</label>
-              <div className="relative">
-                <input 
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="הזן סיסמה..."
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-center tracking-widest text-lg font-bold transition-all text-slate-800"
-                  required
-                />
-              </div>
-              {authError && (
-                <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                  <span className="w-1 h-1 rounded-full bg-red-500 inline-block"></span>
-                  סיסמה שגויה, נסה שוב.
-                </p>
-              )}
-            </div>
-
+          {/* Login tab switcher */}
+          <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
             <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+              onClick={() => { setLoginMethod('password'); setAuthError(false); }}
+              className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${loginMethod === 'password' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              <span>התחבר למערכת</span>
+              התחברות עם סיסמה
             </button>
-          </form>
+            <button
+              onClick={() => { setLoginMethod('email'); setAuthError(false); }}
+              className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${loginMethod === 'email' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              אימות במייל (OTP)
+            </button>
+          </div>
+
+          {loginMethod === 'password' ? (
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">סיסמת מנהל כניסה</label>
+                <div className="relative">
+                  <input 
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="הזן סיסמה..."
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-center tracking-widest text-lg font-bold transition-all text-slate-800"
+                    required
+                  />
+                </div>
+                {authError && (
+                  <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
+                    סיסמה שגויה, נסה שוב.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>התחבר למערכת</span>
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-xs font-bold text-slate-500">דוא"ל מנהל המוגדר במערכת</label>
+                  {otpSent && (
+                    <button
+                      type="button"
+                      onClick={() => { setOtpSent(false); setLoginCode(''); }}
+                      className="text-xs text-blue-600 hover:underline font-semibold"
+                    >
+                      שנה מייל
+                    </button>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  <input 
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="הזן אימייל..."
+                    className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold text-slate-800"
+                    required
+                    disabled={otpSent}
+                  />
+                  {!otpSent && (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={otpLoading}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 rounded-xl shadow-sm transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50"
+                    >
+                      {otpLoading ? 'שולח...' : 'שלח קוד'}
+                    </button>
+                  )}
+                </div>
+                {otpSent && (
+                  <span className="text-[10px] text-emerald-600 font-semibold mt-1 block leading-normal">
+                     נשלח קוד אימות חד-פעמי למייל! אנא בדוק את תיבת הדואר הנכנס.
+                  </span>
+                )}
+              </div>
+
+              {otpSent && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">הזן קוד אימות בן 6 ספרות</label>
+                  <input 
+                    type="text"
+                    maxLength={6}
+                    value={loginCode}
+                    onChange={(e) => setLoginCode(e.target.value)}
+                    placeholder="------"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-center tracking-[8px] text-lg font-bold text-slate-800"
+                    required
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!otpSent}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>אמת והתחבר למערכת</span>
+              </button>
+            </form>
+          )}
 
           <div className="text-center mt-6 text-xs text-slate-400">
             מערכת ניהול מבוזרת &copy; {new Date().getFullYear()}
@@ -1287,7 +1514,7 @@ export default function App() {
                 <tbody className="divide-y divide-slate-100">
                   {salesLogs.map(log => (
                     <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-3.5 font-mono text-slate-400 text-slate-500">
+                      <td className="p-3.5 font-mono text-slate-500">
                         {new Date(log.timestamp).toLocaleString('he-IL')}
                       </td>
                       <td className="p-3.5 font-bold text-slate-700">{log.itemName}</td>
@@ -1339,7 +1566,7 @@ export default function App() {
                     value={settings.managerEmail}
                     onChange={(e) => setSettings({ ...settings, managerEmail: e.target.value })}
                     placeholder="למשל: manager@tt.org"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold text-slate-800"
                     required
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block leading-normal">
@@ -1358,10 +1585,29 @@ export default function App() {
                     value={settings.customLogoUrl}
                     onChange={(e) => setSettings({ ...settings, customLogoUrl: e.target.value })}
                     placeholder="הדבק קישור (למשל: https://host.com/images/logo.png)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold text-left"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold text-left text-slate-800"
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block leading-normal">
                     הדבק כאן קישור ישיר ללוגו והוא יתעדכן מיידית במסך הכניסה ובחלק העליון של ממשק הניהול.
+                  </span>
+                </div>
+
+                {/* Manager portal password field */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                    <SlidersHorizontal className="h-4 w-4 text-blue-500" />
+                    <span>סיסמת כניסה למנהל (סיסמת Firebase)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.managerPassword || '1234'}
+                    onChange={(e) => setSettings({ ...settings, managerPassword: e.target.value })}
+                    placeholder="הקלד סיסמה חדשה (ברירת מחדל: 1234)"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block leading-normal">
+                    סיסמת המנהל תתעדכן ישירות ב-Firebase ומאפשרת לשנות את ה-1,2,3,4 הבסיסית בצורה נקייה ומאובטחת.
                   </span>
                 </div>
 
@@ -1381,9 +1627,25 @@ export default function App() {
                     אפשר התראות אימייל אקטיביות
                   </label>
                   <span className="text-xs block text-slate-400">
-                    כאשר תיבה זו מסומנת, המערכת תיגש ללייזר שליחת המיילים בעת רכישות.
+                    כאשר תיבה זו מסומנת, המערכת תיגש לשרת שליחת המיילים בעת רכישות.
                   </span>
                 </div>
+              </div>
+
+              {/* Verification dispatch tester */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <span className="block text-sm font-bold text-slate-705 text-slate-800">בדיקת תקינות התראות וסנכרון מיילים</span>
+                  <span className="text-xs block text-slate-400">שלח דוא"ל נסיוני מעוצב לכתובת המוגדרת לעיל כדי לוודא קבלה.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSendTestEmail}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2 px-4 rounded-xl shadow transition-all cursor-pointer inline-flex items-center gap-1.5 shrink-0 self-stretch sm:self-auto justify-center"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>שלח מייל בדיקה</span>
+                </button>
               </div>
 
               {/* Info text */}

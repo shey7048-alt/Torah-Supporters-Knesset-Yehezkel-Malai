@@ -39,6 +39,8 @@ export interface SystemSettings {
   managerEmail: string;
   lowStockAlertActive: boolean;
   alertEmailSentFor: string[]; // itemIds that already notified to prevent spamming
+  managerPassword?: string;
+  hasSeededItems?: boolean;
 }
 
 export interface DashboardStats {
