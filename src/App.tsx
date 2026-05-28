@@ -993,19 +993,23 @@ export default function App() {
   const totalAccumulatedProfit = salesLogs.reduce((sum, log) => sum + log.profit, 0);
 
   // Logo fallback handler
-  const activeLogoUrl = settings.customLogoUrl || logoUrl;
+  const activeLogoUrl = (settings.customLogoUrl && !settings.customLogoUrl.includes('logo.svg') && settings.customLogoUrl.trim() !== '') ? settings.customLogoUrl : logoUrl;
 
   // RENDER INTERFACE
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative" dir="rtl">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 flex items-center justify-center p-4 relative" dir="rtl">
+        {/* Subtle decorative background lights */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full filter blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-[100px] pointer-events-none"></div>
+
         {/* Toast notifications */}
         {toast && (
           <div className="fixed top-5 left-5 z-50 max-w-sm w-full transition-all duration-300">
-            <div className={`p-4 rounded-xl shadow-sm border flex items-center justify-between gap-3 text-white ${
+            <div className={`p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 text-white ${
               toast.type === 'error' ? 'bg-red-600 border-red-500' :
               toast.type === 'warning' ? 'bg-amber-600 border-amber-500' :
-              toast.type === 'info' ? 'bg-blue-600 border-blue-500' : 'bg-emerald-600 border-emerald-500'
+              toast.type === 'info' ? 'bg-indigo-600 border-indigo-500' : 'bg-emerald-600 border-emerald-500'
             }`}>
               <span className="text-sm font-semibold">{toast.message}</span>
               <button onClick={() => setToast(null)} className="text-white hover:text-slate-100">
@@ -1015,78 +1019,77 @@ export default function App() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md w-full border border-slate-200">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center mb-4">
-              {!logoError ? (
-                <img 
-                  src={activeLogoUrl} 
-                  alt="Torah Supporters Logo" 
-                  className="h-28 w-auto object-contain mx-auto"
-                  onError={() => setLogoError(true)}
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-xl bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center text-3xl">
-                  <Shirt className="h-8 w-8 text-blue-600" />
-                </div>
-              )}
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)] p-8 max-w-md w-full border border-slate-200/55 relative overflow-hidden transition-all duration-300">
+          {/* Top aesthetic gold gradient trim */}
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600"></div>
+
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center mb-5 p-1 bg-slate-50 rounded-2xl border border-slate-100/80 shadow-inner">
+              <img 
+                src={activeLogoUrl} 
+                alt="לוגו תת כנסת יחזקאל" 
+                className="h-28 w-auto object-contain mx-auto"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = logoUrl;
+                }}
+              />
             </div>
             
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">חדר מכירות ת"ת כנסת יחזקאל</h1>
-            <p className="text-slate-400 text-xs mt-1">ממשק ניהול ובקרת כניסה מאובטחת</p>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">חדר מכירות ת"ת כנסת יחזקאל</h1>
+            <p className="text-slate-500 text-xs font-semibold">מערכת בקרת מלאי וכניסה מאובטחת למורשים בלבד</p>
           </div>
 
           {/* Login tab switcher */}
-          <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+          <div className="flex bg-slate-100/80 p-1 rounded-2xl mb-6 border border-slate-200/40">
             <button
               onClick={() => { setLoginMethod('password'); setAuthError(false); }}
-              className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${loginMethod === 'password' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`flex-1 text-center py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 cursor-pointer ${loginMethod === 'password' ? 'bg-slate-900 text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
             >
               התחברות עם סיסמה
             </button>
             <button
               onClick={() => { setLoginMethod('email'); setAuthError(false); }}
-              className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${loginMethod === 'email' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`flex-1 text-center py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 cursor-pointer ${loginMethod === 'email' ? 'bg-slate-900 text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
             >
               אימות במייל (OTP)
             </button>
           </div>
 
           {loginMethod === 'password' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">סיסמת מנהל כניסה</label>
+                <label className="block text-xs font-bold text-slate-500 mb-2">סיסמת מנהל כניסה</label>
                 <div className="relative">
                   <input 
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="הזן סיסמה..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-center tracking-widest text-lg font-bold transition-all text-slate-800"
+                    placeholder="הזן סיסמת מפתח..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 focus:bg-white text-center tracking-widest text-lg font-black transition-all text-slate-850"
                     required
                   />
                 </div>
                 {authError && (
-                  <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
-                    סיסמה שגויה, נסה שוב.
+                  <p className="text-rose-600 text-xs mt-2.5 flex items-center gap-1.5 font-bold">
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                    <span>סיסמה שגויה, אנא נסו שוב.</span>
                   </p>
                 )}
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-extrabold py-3 px-4 rounded-2xl shadow-lg border border-amber-500/20 hover:border-amber-400/50 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer text-sm"
               >
-                <span>התחבר למערכת</span>
+                <span>כניסה למערכת המלאי</span>
               </button>
             </form>
           ) : (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-5">
               <div>
-                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center mb-4">
-                  <span className="block text-xs text-slate-400 mb-1">קוד האימות יישלח לכתובת המייל הרשומה של מנהל הת"ת:</span>
-                  <strong className="block text-sm text-slate-800 font-bold tracking-wide break-all">
+                <div className="bg-amber-50/50 border border-amber-200/40 p-4 rounded-2xl text-center mb-4">
+                  <span className="block text-xs text-slate-500 mb-1.5">קוד האימות החד-פעמי יישלח לכתובת המייל המוגדרת:</span>
+                  <strong className="block text-sm text-slate-800 font-extrabold tracking-wide break-all">
                     {settings.managerEmail || 'shey7048@gmail.com'}
                   </strong>
                 </div>
@@ -1096,25 +1099,25 @@ export default function App() {
                     type="button"
                     onClick={handleSendOtp}
                     disabled={otpLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mb-2"
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-extrabold py-3 px-4 rounded-2xl shadow-lg border border-amber-500/20 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm mb-2"
                   >
-                    {otpLoading ? 'שולח קוד אימות...' : 'שלח קוד אימות חד-פעמי למייל'}
+                    {otpLoading ? 'מחולל קוד ושולח...' : 'שלח קוד אימות חד-פעמי למייל'}
                   </button>
                 ) : (
                   <div className="space-y-3">
-                    <span className="text-xs text-emerald-600 font-semibold text-center block bg-emerald-50 py-2 px-3 rounded-lg border border-emerald-100">
-                      ✓ קוד אימות חד-פעמי נשלח למייל המנהל!
+                    <span className="text-xs text-emerald-700 font-bold text-center block bg-emerald-50 py-2.5 px-3 rounded-xl border border-emerald-100">
+                      ✓ קוד אימות נשלח בהצלחה לתיבת הדואר שלכם!
                     </span>
                     
                     <div>
                       <div className="flex justify-between items-center mb-1.5">
-                        <label className="block text-xs font-bold text-slate-500">הזן קוד אימות בן 6 ספרות</label>
+                        <label className="block text-xs font-bold text-slate-500">הזן קוד אימות (6 ספרות)</label>
                         <button
                           type="button"
                           onClick={() => { setOtpSent(false); setLoginCode(''); }}
-                          className="text-xs text-blue-600 hover:underline font-semibold"
+                          className="text-xs text-amber-600 hover:text-amber-700 font-bold transition-colors"
                         >
-                          שלח שוב
+                          שליחה מחדש
                         </button>
                       </div>
                       <input 
@@ -1123,7 +1126,7 @@ export default function App() {
                         value={loginCode}
                         onChange={(e) => setLoginCode(e.target.value)}
                         placeholder="------"
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-center tracking-[8px] text-lg font-bold text-slate-800"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 focus:bg-white text-center tracking-[8px] text-lg font-black text-slate-800"
                         required
                       />
                     </div>
@@ -1134,15 +1137,15 @@ export default function App() {
               <button
                 type="submit"
                 disabled={!otpSent}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold py-3 px-4 rounded-2xl shadow-lg border border-amber-500/20 hover:border-amber-400/55 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                <span>אמת והתחבר למערכת</span>
+                <span>אמת קוד והתחבר לממשק</span>
               </button>
             </form>
           )}
 
-          <div className="text-center mt-6 text-xs text-slate-400">
-            מערכת ניהול מבוזרת &copy; {new Date().getFullYear()}
+          <div className="text-center mt-8 text-[11px] text-slate-400 font-semibold border-t border-slate-100 pt-4">
+            כל הזכויות שמורות לת"ת כנסת יחזקאל &copy; {new Date().getFullYear()}
           </div>
         </div>
       </div>
@@ -1150,15 +1153,15 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen text-slate-900 flex flex-col bg-slate-50" dir="rtl">
+    <div className="min-h-screen text-slate-900 flex flex-col bg-slate-50/60" dir="rtl">
       
       {/* Toast systems */}
       {toast && (
         <div className="fixed top-5 left-5 z-50 max-w-sm w-full transition-all duration-300">
-          <div className={`p-4 rounded-xl shadow-sm border flex items-center justify-between gap-3 text-white ${
+          <div className={`p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 text-white ${
             toast.type === 'error' ? 'bg-red-600 border-red-500' :
             toast.type === 'warning' ? 'bg-amber-600 border-amber-500' :
-            toast.type === 'info' ? 'bg-blue-605 bg-blue-600 border-blue-500' : 'bg-emerald-600 border-emerald-500'
+            toast.type === 'info' ? 'bg-slate-900 border-slate-800' : 'bg-emerald-600 border-emerald-500'
           }`}>
             <span className="text-sm font-semibold">{toast.message}</span>
             <button onClick={() => setToast(null)} className="text-white hover:text-slate-100">
@@ -1168,61 +1171,60 @@ export default function App() {
         </div>
       )}
 
-      {/* Main header block */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+      {/* Main header block in Royal Navy and Gold */}
+      <header className="bg-slate-950 text-white border-b border-amber-500/20 sticky top-0 z-40 shadow-xl">
+        {/* Subtle decorative gold streak */}
+        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 w-full"></div>
+        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center min-w-[50px] justify-center">
-                {!logoError ? (
-                  <img 
-                    src={activeLogoUrl} 
-                    alt="Torah Supporters" 
-                    className="h-16 w-auto object-contain"
-                    onError={() => setLogoError(true)}
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200 text-blue-600">
-                    <Shirt className="h-6 w-6" />
-                  </div>
-                )}
+          <div className="flex justify-between items-center h-22">
+            <div className="flex items-center gap-4 py-2">
+              <div className="flex items-center min-w-[55px] justify-center p-1.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 shadow-md">
+                <img 
+                  src={activeLogoUrl} 
+                  alt="לוגו תת כנסת יחזקאל" 
+                  className="h-14 w-auto object-contain max-h-[56px]"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = logoUrl;
+                  }}
+                />
               </div>
               <div>
-                <span className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight block">חדר מכירות ת"ת כנסת יחזקאל</span>
-                <span className="text-xs text-blue-600 font-semibold block -mt-1">ממשק ניהול ובקרת מלאי</span>
+                <span className="text-lg sm:text-2xl font-black text-white tracking-tight block drop-shadow-sm text-gradient bg-gradient-to-r from-white via-slate-100 to-amber-200 bg-clip-text">חדר מכירות ת"ת כנסת יחזקאל</span>
+                <span className="text-xs text-amber-400 font-bold block mt-0.5 tracking-wider">ממשק משולב • ניהול מלאי ויומן רווחים</span>
               </div>
             </div>
 
             {/* Header Action bar */}
-            <div className="flex items-center gap-3">
-              <div className="hidden md:flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+            <div className="flex items-center gap-4">
+              <div className="hidden md:flex items-center bg-slate-900 border border-slate-800 p-1.5 rounded-2xl">
                 <button
                   onClick={() => setActiveTab('inventory')}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'inventory' ? 'bg-white text-blue-600 border border-slate-200/50 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 ${activeTab === 'inventory' ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md transform scale-102 font-black' : 'text-slate-400 hover:text-white'}`}
                 >
                   מלאי פריטים
                 </button>
                 <button
                   onClick={() => setActiveTab('sales')}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'sales' ? 'bg-white text-blue-600 border border-slate-200/50 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 ${activeTab === 'sales' ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md transform scale-102 font-black' : 'text-slate-400 hover:text-white'}`}
                 >
                   יומן מכירות
                 </button>
                 <button
                   onClick={() => setActiveTab('settings')}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'settings' ? 'bg-white text-blue-600 border border-slate-200/50 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 ${activeTab === 'settings' ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md transform scale-102 font-black' : 'text-slate-400 hover:text-white'}`}
                 >
                   הגדרות והתראות
                 </button>
               </div>
 
-              <div className="h-6 w-px bg-slate-200 hidden md:block"></div>
+              <div className="h-6 w-px bg-slate-800 hidden md:block"></div>
 
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 text-slate-500 hover:text-red-600 hover:bg-slate-100 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer border border-transparent hover:border-slate-200"
+                className="flex items-center gap-2 text-slate-400 hover:text-rose-400 hover:bg-white/5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer border border-transparent hover:border-slate-800"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4 text-amber-500" />
                 <span className="hidden sm:inline">התנתק</span>
               </button>
             </div>
@@ -1230,98 +1232,112 @@ export default function App() {
         </div>
       </header>
 
-      {/* Responsive mobile sub-bar */}
-      <div className="md:hidden bg-white border-b border-slate-200 flex p-2 sticky top-[81px] z-30 justify-around">
+      {/* Responsive mobile sub-bar in Royal navy */}
+      <div className="md:hidden bg-slate-950 text-white border-b border-amber-500/10 flex p-1.5 sticky top-[89px] z-30 justify-around shadow-lg">
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'inventory' ? 'bg-slate-100 text-blue-600' : 'text-slate-550 text-slate-600'}`}
+          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'inventory' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400'}`}
         >
           <Shirt className="h-4 w-4" />
-          <span>מלאי פריטים</span>
+          <span>מלאי</span>
         </button>
         <button
           onClick={() => setActiveTab('sales')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'sales' ? 'bg-slate-100 text-blue-600' : 'text-slate-550 text-slate-600'}`}
+          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'sales' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400'}`}
         >
           <History className="h-4 w-4" />
           <span>יומן מכירות</span>
         </button>
         <button
           onClick={() => setActiveTab('settings')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-slate-100 text-blue-600' : 'text-slate-550 text-slate-600'}`}
+          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400'}`}
         >
           <Settings className="h-4 w-4" />
-          <span>הגדרות והתראות</span>
+          <span>הגדרות</span>
         </button>
       </div>
 
       {/* Main app boundaries */}
       <main className="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
-        {/* Dashboard quick stats row summaries */}
+        {/* Dashboard quick stats row summaries (Luxury gold/navy accent designs) */}
         <section className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase mb-1">דגמים בקטלוג</p>
-              <h3 className="text-2xl font-bold tracking-tight text-slate-900">{totalModelsCount}</h3>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-              <Tag className="h-5 w-5 text-blue-600" />
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase mb-1">מלאי במחסן</p>
-              <h3 className="text-2xl font-bold tracking-tight text-slate-900">{totalGarmentsCount}</h3>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-              <Shirt className="h-5 w-5 text-blue-600" />
+          
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_4px_16px_rgba(148,163,184,0.05)] hover:shadow-md transition-all duration-200 border-t-4 border-t-slate-900 group">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-1">דגמים בקטלוג</p>
+                <h3 className="text-2xl font-black text-slate-900 group-hover:text-amber-500 transition-colors">{totalModelsCount} <span className="text-xs font-normal text-slate-400">דגמיםแตกต่างים</span></h3>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/50 flex items-center justify-center shrink-0">
+                <Tag className="h-5 w-5 text-slate-700" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between col-span-2 lg:col-span-1">
-            <div>
-              <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase mb-1">שווי מלאי (עלות)</p>
-              <h3 className="text-2xl font-bold tracking-tight text-emerald-600">₪{totalWholesaleValue.toLocaleString()}</h3>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_4px_16px_rgba(148,163,184,0.05)] hover:shadow-md transition-all duration-200 border-t-4 border-t-amber-500 group">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-1">סה"כ פריטים במלאי</p>
+                <h3 className="text-2xl font-black text-slate-900">{totalGarmentsCount} <span className="text-xs font-normal text-slate-400">יחידות</span></h3>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <Shirt className="h-5 w-5 text-amber-600" />
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_4px_16px_rgba(148,163,184,0.05)] hover:shadow-md transition-all duration-200 border-t-4 border-t-emerald-600 group">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-1">שווי מלאי במחיר עלות</p>
+                <h3 className="text-2xl font-black text-emerald-600">₪{totalWholesaleValue.toLocaleString()}</h3>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <TrendingUp className="h-5 w-5 text-emerald-600" />
+              </div>
             </div>
           </div>
 
           <div 
             onClick={() => setIsLowStockModalOpen(true)}
-            className={`p-6 rounded-2xl border flex items-center justify-between cursor-pointer transition-all duration-200 relative group select-none ${
-              lowStockModelsCount > 0 ? 'bg-red-50/50 border-red-200/60 shadow-sm' : 'bg-white border-slate-200 shadow-sm'
+            className={`p-6 rounded-2xl border transition-all duration-200 relative group select-none ${
+              lowStockModelsCount > 0 
+                ? 'bg-rose-50/20 border-rose-100 shadow-[0_4px_20px_rgba(244,63,94,0.08)] border-t-4 border-t-rose-500 hover:bg-rose-50/40 cursor-pointer' 
+                : 'bg-white border-slate-100 shadow-[0_4px_16px_rgba(148,163,184,0.05)] border-t-4 border-t-slate-400 hover:shadow-md'
             }`}
           >
-            <div>
-              <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase mb-1">דגמים בחוסר</p>
-              <h3 className={`text-2xl font-bold tracking-tight ${lowStockModelsCount > 0 ? 'text-red-600' : 'text-slate-900'}`}>{lowStockModelsCount}</h3>
-              <p className="text-[10px] text-blue-600 group-hover:underline mt-1 font-bold">לחץ לפירוט</p>
-            </div>
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-              lowStockModelsCount > 0 ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : 'bg-slate-50 text-slate-550 border border-slate-100'
-            }`}>
-              <AlertTriangle className="h-5 w-5" />
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-1">דגמים מתחת לסף מינימום</p>
+                <h3 className={`text-2xl font-black ${lowStockModelsCount > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{lowStockModelsCount}</h3>
+                {lowStockModelsCount > 0 && <span className="text-[10px] text-rose-500 font-bold underline animate-pulse block mt-1">לחצו להצגת דוח פריטים בחוסר</span>}
+              </div>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                lowStockModelsCount > 0 ? 'bg-rose-100 text-rose-600 border border-rose-200 animate-pulse' : 'bg-slate-50 text-slate-500 border border-slate-200/50'
+              }`}>
+                <AlertTriangle className="h-5 w-5" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between col-span-2 lg:col-span-1">
-            <div className="flex-grow">
-              <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase mb-1">רווח ממכירות</p>
-              <h3 className="text-2xl font-bold tracking-tight text-violet-650 text-violet-600">₪{totalAccumulatedProfit.toLocaleString()}</h3>
-              <button 
-                onClick={handleResetProfit}
-                className="text-[10px] text-slate-400 hover:text-red-500 font-bold mt-1 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="h-3 w-3" />
-                <span>אפס נתונים</span>
-              </button>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center shrink-0">
-              <TrendingUp className="h-5 w-5 text-violet-600" />
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_4px_16px_rgba(148,163,184,0.05)] hover:shadow-md transition-all duration-200 border-t-4 border-t-indigo-600 group">
+            <div className="flex items-start justify-between">
+              <div className="flex-grow">
+                <p className="text-slate-400 text-xs font-bold mb-1">רווח מצטבר ממכירות קופסא</p>
+                <h3 className="text-2xl font-black text-indigo-700">₪{totalAccumulatedProfit.toLocaleString()}</h3>
+                <button 
+                  onClick={handleResetProfit}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 font-bold mt-1.5 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="אפס מד רווחים מצטבר"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>איפוס רווחים</span>
+                </button>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                <TrendingUp className="h-5 w-5 text-indigo-600" />
+              </div>
             </div>
           </div>
         </section>
@@ -1343,7 +1359,7 @@ export default function App() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="חיפוש לפי שם דגם, מק״ט ברקוד או צבע פריט..."
-                    className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-sm font-semibold"
+                    className="w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-slate-900 focus:bg-white transition-all text-sm font-semibold"
                   />
                 </div>
 
@@ -1351,14 +1367,14 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   
                   {/* Plus vs Minus action configurations */}
-                  <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 shrink-0">
+                  <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 shrink-0 border border-slate-200/50">
                     <span className="text-xs font-bold text-slate-500 px-2 hidden xl:inline">פעולת מינוס (-):</span>
                     <button
                       onClick={() => {
                         setMinusAction('sale');
                         triggerToast('פעולת מינוס הוגדרה כמכירה: מחייב רישום רווח ביומן', 'info');
                       }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${minusAction === 'sale' ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-600 hover:bg-slate-50'}`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${minusAction === 'sale' ? 'bg-slate-900 text-amber-400 shadow-sm border border-slate-850' : 'text-slate-600 hover:bg-slate-50'}`}
                       title="הפחתת מלאי תירשם כמכירה ותחשב רווחים"
                     >
                       <span>מכירה ורווח</span>
@@ -1368,7 +1384,7 @@ export default function App() {
                         setMinusAction('correct');
                         triggerToast('פעולת מינוס הוגדרה כתיקון/הגרה בלבד, ללא עדכון רווחים', 'warning');
                       }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${minusAction === 'correct' ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-600 hover:bg-slate-50'}`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${minusAction === 'correct' ? 'bg-slate-900 text-amber-400 shadow-sm border border-slate-850' : 'text-slate-600 hover:bg-slate-50'}`}
                       title="הפחתת מלאי לתיקון טעויות ללא רישום רווח"
                     >
                       <span>עודפים / עודכני</span>
@@ -1380,7 +1396,7 @@ export default function App() {
                     <select
                       value={selectedCategory}
                       onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700"
+                      className="bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-slate-700 cursor-pointer"
                     >
                       <option value="">כל הקטגוריות</option>
                       {categories.map(c => (
@@ -1391,7 +1407,7 @@ export default function App() {
                     <select
                       value={selectedStockFilter}
                       onChange={(e) => setSelectedStockFilter(e.target.value as any)}
-                      className="bg-slate-550 bg-slate-50 border border-slate-200 rounded-xl py-2 px-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700"
+                      className="bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-slate-700 cursor-pointer"
                     >
                       <option value="all">כל המלאי</option>
                       <option value="low">במלאי נמוך בלבד</option>
@@ -1401,7 +1417,7 @@ export default function App() {
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as any)}
-                      className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700"
+                      className="bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-slate-700 cursor-pointer"
                     >
                       <option value="newest">חדש ביותר</option>
                       <option value="name">לפי אלפבית</option>
@@ -1415,18 +1431,18 @@ export default function App() {
               </div>
 
               {/* Utility management row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => openItemModal(null)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all duration-200 shadow-sm flex items-center gap-2 cursor-pointer"
+                    className="bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-extrabold py-2.5 px-5 rounded-xl transition-all duration-200 shadow-md border border-amber-500/10 flex items-center gap-2 cursor-pointer"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-4 w-4 text-amber-400" />
                     <span>הוספת דגם חדש</span>
                   </button>
                   <button
                     onClick={() => setIsCategoryModalOpen(true)}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all duration-200 flex items-center gap-2 text-xs border border-slate-200/50"
+                    className="bg-slate-100 hover:bg-slate-250 hover:bg-slate-200/80 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all duration-200 flex items-center gap-2 text-xs border border-slate-200/50 cursor-pointer"
                   >
                     <Layers className="h-4 w-4 text-slate-600" />
                     <span>ניהול קטגוריות</span>
@@ -1519,44 +1535,44 @@ export default function App() {
                           <span className="font-mono bg-slate-100 px-2 py-0.5 rounded-md text-[10px] text-slate-500">מק"ט: {item.sku}</span>
                           <span className="bg-slate-100 px-2 py-0.5 rounded-md text-[10px] text-slate-500">צבע: {item.color}</span>
                         </div>
-                        <h4 className="text-base font-extrabold text-slate-800 line-clamp-2 mt-2 group-hover:text-blue-600 transition-colors" title={item.name}>{item.name}</h4>
+                        <h4 className="text-base font-extrabold text-slate-900 line-clamp-2 mt-2 group-hover:text-amber-550 group-hover:text-amber-600 transition-colors" title={item.name}>{item.name}</h4>
 
                         {/* Financial and pricing rows (Ultra professional micro-dashboard styling) */}
                         <div className="grid grid-cols-3 gap-1 bg-slate-50/70 p-3 rounded-xl border border-slate-100/80 text-center mt-3">
                           <div className="flex flex-col justify-center">
-                            <span className="text-[10px] text-slate-400 font-medium leading-none mb-1">עלות רכש</span>
-                            <span className="text-xs font-bold text-slate-700">₪{item.costPrice}</span>
+                            <span className="text-[10px] text-slate-400 font-semibold leading-none mb-1">עלות רכש</span>
+                            <span className="text-xs font-black text-slate-705 text-slate-700">₪{item.costPrice}</span>
                           </div>
                           <div className="border-r border-slate-200/60 flex flex-col justify-center">
-                            <span className="text-[10px] text-slate-400 font-medium leading-none mb-1">מחיר צרכן</span>
-                            <span className="text-xs font-black text-blue-600">₪{item.sellPrice}</span>
+                            <span className="text-[10px] text-slate-400 font-semibold leading-none mb-1">מחיר מכירה</span>
+                            <span className="text-xs font-black text-slate-900">₪{item.sellPrice}</span>
                           </div>
                           <div className="border-r border-slate-200/60 flex flex-col justify-center">
-                            <span className="text-[10px] text-slate-400 font-medium leading-none mb-1">רווח נקי</span>
+                            <span className="text-[10px] text-slate-400 font-semibold leading-none mb-1">רווח נקי</span>
                             <span className="text-xs font-black text-emerald-600">₪{item.sellPrice - item.costPrice}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Interactive size matrix */}
+                      {/* Interactive size matrix with gold touches */}
                       <div className="border-t border-b border-dashed border-slate-200/80 py-3.5">
-                        <span className="text-[11px] font-bold text-slate-400 block mb-2 text-right">מלאי ועדכון מהיר לפי מידה:</span>
+                        <span className="text-[11px] font-extrabold text-slate-500 block mb-2 text-right">יתרת מלאי ועדכון מהיר לפי מידה:</span>
                         <div className="grid grid-cols-4 gap-2 max-h-44 overflow-y-auto pr-0.5 lg:grid-cols-4">
                           {(Object.entries(item.sizes) as [string, number][]).map(([szName, qty]) => (
-                            <div key={szName} className="border border-slate-100 rounded-xl p-2 flex flex-col items-center justify-between bg-white shadow-sm hover:border-blue-200 transition-all duration-150 group/size relative">
-                              <span className="text-[10px] font-bold text-slate-400 block text-center truncate w-full" title={szName}>{szName}</span>
-                              <span className={`text-xs font-black my-1 ${qty === 0 ? 'text-rose-500' : qty <= 2 ? 'text-amber-500 font-black' : 'text-slate-800'}`}>{qty} יח'</span>
+                            <div key={szName} className="border border-slate-100 rounded-xl p-2 flex flex-col items-center justify-between bg-white shadow-sm hover:border-amber-400/50 transition-all duration-150 group/size relative">
+                              <span className="text-[10px] font-bold text-slate-500 block text-center truncate w-full" title={szName}>{szName}</span>
+                              <span className={`text-xs font-black my-1 ${qty === 0 ? 'text-rose-500' : qty <= 2 ? 'text-amber-600 font-black' : 'text-slate-850'}`}>{qty} יח'</span>
                               <div className="flex gap-1 w-full justify-center">
                                 <button 
                                   onClick={() => handleQuickStockChange(item, szName, -1)}
-                                  className="w-5 h-5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 text-slate-500 hover:text-rose-600 rounded-md flex items-center justify-center text-xs font-extrabold cursor-pointer transition-all duration-100 active:scale-90"
+                                  className="w-5 h-5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 text-slate-500 hover:text-rose-600 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
                                   title="הפחת 1 יח'"
                                 >
                                   -
                                 </button>
                                 <button 
                                   onClick={() => handleQuickStockChange(item, szName, 1)}
-                                  className="w-5 h-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200/60 text-slate-500 hover:text-emerald-600 rounded-md flex items-center justify-center text-xs font-extrabold cursor-pointer transition-all duration-100 active:scale-90"
+                                  className="w-5 h-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200/60 text-slate-500 hover:text-emerald-700 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
                                   title="הוסף 1 יח'"
                                 >
                                   +
@@ -1570,16 +1586,16 @@ export default function App() {
                       {/* Card lower interactions */}
                       <div className="flex items-center justify-between pt-1">
                         <div>
-                          <span className="text-[10px] font-medium text-slate-400 block leading-tight">סה"כ במלאי:</span>
-                          <span className="text-base font-black text-slate-800 leading-none">
-                            {totalStock} <span className="text-xs font-bold text-slate-500">יח'</span>
+                          <span className="text-[10px] font-semibold text-slate-400 block leading-tight">סה"כ במלאי:</span>
+                          <span className="text-base font-black text-slate-900 leading-none">
+                            {totalStock} <span className="text-xs font-bold text-slate-500">יחידות</span>
                           </span>
                         </div>
 
                         <div className="flex gap-1.5">
                           <button
                             onClick={() => openItemModal(item)}
-                            className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-all cursor-pointer border border-slate-200/60 hover:border-blue-200 shadow-sm"
+                            className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:text-amber-400 hover:bg-slate-900 flex items-center justify-center transition-all cursor-pointer border border-slate-200/60 hover:border-slate-800 shadow-sm"
                             title="עריכת דגם"
                           >
                             <Edit className="h-4 w-4" />
