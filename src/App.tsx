@@ -366,13 +366,24 @@ export default function App() {
               totalStock,
               managerEmail: settings.managerEmail
             })
-          }).catch((err) => {
-            console.error("Failed to notify backend SMTP low stock watcher:", err);
+          })
+          .then(async (res) => {
+            if (res.ok) {
+              // Mark email as sent to prevent duplicates ONLY if it sent successfully!
+              const updatedAlertKeys = [...settings.alertEmailSentFor, alertKey];
+              await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+              triggerToast(`נשלחה התראת חוסר במלאי למייל המנהל!`, 'info');
+              console.log("Low stock alert email sent successfully.");
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              console.error("SMTP stock alert failed on server:", errData.error);
+              triggerToast(`נכשל שליחת אימייל התראת מלאי: ${errData.error || 'בדוק הגדרות במערכת'}`, 'warning');
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to notify backend SMTP low stock watcher due to network error:", err);
+            triggerToast(`שגיאת תקשורת בשליחת דוא״ל: ${err.message || err}`, 'error');
           });
-
-          // Mark email as sent to prevent duplicates
-          const updatedAlertKeys = [...settings.alertEmailSentFor, alertKey];
-          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `sales/${saleId} or items/${item.id}`);
@@ -440,6 +451,56 @@ export default function App() {
           // Fallback if canvas ctx fails
           setFormImage(img.src);
           triggerToast('התמונה הועלתה בהצלחה לתצוגה מקדימה!', 'success');
+        }
+      };
+      if (event.target?.result) {
+        img.src = event.target.result as string;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Adaptive uploader for the logo image with automatic canvas compression
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    triggerToast('מעבד את קובץ הלוגו...', 'info');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 450;
+        const MAX_HEIGHT = 150; // Logos are wider than taller
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/png'); // Keeps transparency intact
+          setSettings({ ...settings, customLogoUrl: dataUrl });
+          triggerToast('סמל הלוגו הועלה ועובד בהצלחה! שמור את הטבלה לעדכון לצמיתות במאגר.', 'success');
+        } else {
+          const result = event.target?.result as string;
+          setSettings({ ...settings, customLogoUrl: result });
+          triggerToast('סמל הלוגו הועלה בהצלחה!', 'success');
         }
       };
       if (event.target?.result) {
@@ -1659,21 +1720,79 @@ export default function App() {
                 </div>
 
                 {/* Custom Branding logo configuration */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <ImageIcon className="h-4 w-4 text-blue-500" />
-                    <span>קישור אינטרנט של סמל הלוגו (URL)</span>
-                  </label>
-                  <input
-                    type="url"
-                    value={settings.customLogoUrl}
-                    onChange={(e) => setSettings({ ...settings, customLogoUrl: e.target.value })}
-                    placeholder="הדבק קישור (למשל: https://host.com/images/logo.png)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold text-left text-slate-800"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-1 block leading-normal">
-                    הדבק כאן קישור ישיר ללוגו והוא יתעדכן מיידית במסך הכניסה ובחלק העליון של ממשק הניהול.
-                  </span>
+                <div className="space-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100 col-span-1 md:col-span-2">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                      <ImageIcon className="h-4 w-4 text-blue-500" />
+                      <span>סמל הלוגו של הת"ת</span>
+                    </label>
+                    <p className="text-[10px] text-slate-400">באפשרותך להעלות תמונה מהמחשב או להזין קישור אינטרנט ישיר.</p>
+                  </div>
+
+                  {/* Logo Image Preview Block */}
+                  {settings.customLogoUrl && (
+                    <div className="flex items-center gap-3 p-3 bg-white border border-slate-150 rounded-xl">
+                      <img 
+                        src={settings.customLogoUrl} 
+                        alt="Logo Preview" 
+                        className="h-10 object-contain bg-slate-50 p-1 rounded border border-slate-100 max-w-[120px]" 
+                        onError={(e) => {
+                          // Fallback if preview fails
+                          (e.target as any).src = "https://torah-supporters-logo-q6t8y35io-aliko-s-projects.vercel.app/";
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">תצוגה מקדימה של הלוגו</span>
+                        <span className="block text-xs font-semibold text-slate-600 truncate">
+                          {settings.customLogoUrl.startsWith('data:') ? 'קובץ תמונה שהועלה (Base64)' : settings.customLogoUrl}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSettings({ ...settings, customLogoUrl: '' });
+                          triggerToast('הלוגו אופס לברירת מחדל!', 'info');
+                        }}
+                        className="text-xs text-rose-500 hover:text-rose-700 font-bold p-1 cursor-pointer hover:bg-rose-50 rounded"
+                        title="אפס לוגו לברירת מחדל"
+                      >
+                        איפוס לוגו
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    {/* Option A: Direct File Upload */}
+                    <div className="relative">
+                      <label className="block text-[11px] font-bold text-slate-505 mb-1 text-slate-500">העלה קובץ תמונה (PNG/JPG)</label>
+                      <div className="flex items-center justify-center w-full">
+                        <label className="flex flex-col items-center justify-center w-full h-12 border border-slate-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 hover:border-blue-400 transition-all">
+                          <div className="flex items-center gap-2">
+                            <Upload className="w-4 h-4 text-slate-400" />
+                            <span className="text-xs font-bold text-slate-500">לחץ לבחירת קובץ</span>
+                          </div>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleLogoUpload} 
+                            className="hidden" 
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Option B: Web URL Input */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">או הדבק קישור לוגו חיצוני (URL)</label>
+                      <input
+                        type="url"
+                        value={settings.customLogoUrl}
+                        onChange={(e) => setSettings({ ...settings, customLogoUrl: e.target.value })}
+                        placeholder="למשל: https://site.com/logo.png"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs font-semibold text-left text-slate-800"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Placeholder empty div to preserve clean layout since password is now in a distinct safe block below */}

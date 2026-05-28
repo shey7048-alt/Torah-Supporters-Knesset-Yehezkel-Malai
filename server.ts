@@ -97,12 +97,13 @@ const defaultSettings: SystemSettings = {
   alertEmailSentFor: []
 };
 
-// Lazy initialize Nodemailer Transporter
+// Lazy initialize Nodemailer Transporter with adaptive configuration
 function getMailTransporter() {
-  const user = process.env.EMAIL_USER || process.env.SMTP_USER;
-  const pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
-  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
+  const user = (process.env.EMAIL_USER || process.env.SMTP_USER || '').trim();
+  const pass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').trim();
+  const host = (process.env.EMAIL_HOST || 'smtp.gmail.com').trim();
   const port = parseInt(process.env.EMAIL_PORT || '587');
+  const service = (process.env.EMAIL_SERVICE || '').trim();
 
   if (!user || !pass) {
     // Return a console logging dummy implementation when keys are absent
@@ -119,11 +120,23 @@ function getMailTransporter() {
     };
   }
 
+  // Gmail specific auto service optimization for best delivery rates
+  if (service === 'gmail' || host.toLowerCase().includes('gmail.com')) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass }
+    });
+  }
+
   return nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
-    auth: { user, pass }
+    secure: port === 465, // true for 465, false for 587/other ports
+    auth: { user, pass },
+    tls: {
+      // Prevents sandbox environment container exceptions on self-signed SMTP handshakes
+      rejectUnauthorized: false
+    }
   });
 }
 
@@ -234,9 +247,9 @@ app.post('/api/send-alert', async (req, res) => {
   try {
     await sendStockAlertEmail(item, sizeName, currentQty, totalStock, managerEmail);
     res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Failed to dispatcher alert SMTP mail:", err);
-    res.status(500).json({ error: "שגיאה בשליחת מייל הבדיקה. וודא כי פרטי ה-SMTP (EMAIL_USER & EMAIL_PASS) מוגדרים כהלכה בלוח הסודות." });
+    res.status(500).json({ error: `שגיאה בשליחת מייל הבדיקה: ${err.message || err}. וודא כי פרטי ה-SMTP (EMAIL_USER & EMAIL_PASS) מוגדרים כהלכה בלוח הסודות.` });
   }
 });
 
@@ -302,9 +315,9 @@ app.post('/api/send-auth-code', async (req, res) => {
     });
 
     res.json({ success: true, message: 'קוד אימות נשלח בהצלחה לכתובת המייל!' });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Failed to dispatcher OTP validation mail:", err);
-    res.status(500).json({ error: 'שגיאה בשליחת המייל. ודא כי פרטי ה-SMTP מוגדרים כראוי.' });
+    res.status(500).json({ error: `שגיאה בשליחת המייל: ${err.message || err}. ודא כי פרטי ה-SMTP מוגדרים כראוי בלוח הסודות.` });
   }
 });
 
