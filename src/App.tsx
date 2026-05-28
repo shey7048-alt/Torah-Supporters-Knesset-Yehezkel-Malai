@@ -95,6 +95,15 @@ export default function App() {
   // Toast System
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
 
+  // Change password verification states
+  const [isPwdOtpSent, setIsPwdOtpSent] = useState<boolean>(false);
+  const [isPwdOtpLoading, setIsPwdOtpLoading] = useState<boolean>(false);
+  const [pwdOtpCode, setPwdOtpCode] = useState<string>('');
+  const [isPwdEmailVerified, setIsPwdEmailVerified] = useState<boolean>(false);
+  const [isPwdVerifyLoading, setIsPwdVerifyLoading] = useState<boolean>(false);
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState<string>('');
+
   // Trigger Toast notifications helper
   const triggerToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
     setToast({ message, type });
@@ -245,16 +254,17 @@ export default function App() {
         triggerToast('סיסמת כניסה שגויה, נסה שוב', 'error');
       }
     } else {
-      // Email OTP code authentication
-      if (!loginEmail || !loginCode) {
-        triggerToast('נא להזין כתובת אימייל וקוד אימות', 'error');
+      // Email OTP code authentication - uses the system's fixed email
+      const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
+      if (!loginCode) {
+        triggerToast('נא להזין קוד אימות', 'error');
         return;
       }
       try {
         const res = await fetch('/api/verify-auth-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: loginEmail.toLowerCase().trim(), code: loginCode })
+          body: JSON.stringify({ email: emailToUse, code: loginCode })
         });
         if (res.ok) {
           sessionStorage.setItem('warehouse_is_logged', 'true');
@@ -262,7 +272,7 @@ export default function App() {
           setAuthError(false);
           triggerToast('התחברת בהצלחה באמצעות קוד אימות!', 'success');
         } else {
-          const errData = await res.json();
+          const errData = await res.json().catch(() => ({}));
           triggerToast(errData.error || 'קוד אימות שגוי או פג תוקפו', 'error');
         }
       } catch (err) {
@@ -273,29 +283,19 @@ export default function App() {
   };
 
   const handleSendOtp = async () => {
-    if (!loginEmail.trim()) {
-      triggerToast('נא להזין כתובת דוא"ל חוקית לקבלת הקוד', 'error');
-      return;
-    }
-
-    // Safety guard comparison
-    if (settings.managerEmail && loginEmail.trim().toLowerCase() !== settings.managerEmail.trim().toLowerCase()) {
-      triggerToast('מייל מזין אינו תואם לכתובת המנהל המוגדרת במערכת', 'error');
-      return;
-    }
-
+    const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
     setOtpLoading(true);
     try {
       const res = await fetch('/api/send-auth-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail.toLowerCase().trim() })
+        body: JSON.stringify({ email: emailToUse })
       });
       if (res.ok) {
         setOtpSent(true);
-        triggerToast('קוד אימות נשלח לתיבת המייל שלך!', 'success');
+        triggerToast('קוד אימות נשלח לתיבת המייל של המנהל הרשום!', 'success');
       } else {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         triggerToast(errData.error || 'שגיאה בשליחת קוד אימות', 'error');
       }
     } catch (err) {
@@ -642,13 +642,100 @@ export default function App() {
         })
       });
       if (res.ok) {
-        triggerToast('מייל בדיקה נשלח בהצלחה לכל היעדים!', 'success');
+        triggerToast('מייל בדיקה נשלח בהצלחה לכתובת המייל!', 'success');
       } else {
-        triggerToast('מייל בדיקה נרשם במערכת הלוגים בהצלחה!', 'success');
+        const errData = await res.json().catch(() => ({}));
+        triggerToast(errData.error || 'שגיאה בשליחת מייל הבדיקה', 'error');
       }
     } catch (err) {
       console.error(err);
       triggerToast('שגיאה בשליחת מייל הבדיקה', 'error');
+    }
+  };
+
+  // Change password verification flows
+  const handleSendPwdOtp = async () => {
+    const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
+    setIsPwdOtpLoading(true);
+    try {
+      const res = await fetch('/api/send-auth-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToUse })
+      });
+      if (res.ok) {
+        setIsPwdOtpSent(true);
+        triggerToast('קוד אימות לשינוי סיסמה נשלח למייל בהצלחה!', 'success');
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        triggerToast(errData.error || 'שגיאה בשליחת קוד אימות', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה בשליחת קוד אימות', 'error');
+    } finally {
+      setIsPwdOtpLoading(false);
+    }
+  };
+
+  const handleVerifyPwdOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
+    if (!pwdOtpCode.trim()) {
+      triggerToast('אנא הזן קוד אימות', 'warning');
+      return;
+    }
+    setIsPwdVerifyLoading(true);
+    try {
+      const res = await fetch('/api/verify-auth-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToUse, code: pwdOtpCode })
+      });
+      if (res.ok) {
+        setIsPwdEmailVerified(true);
+        triggerToast('האימייל אומת בהצלחה! כעת מוצגת הסיסמה הישנה ותוכל להחליפה.', 'success');
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        triggerToast(errData.error || 'קוד אימות שגוי או פג תוקפו', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה במהלך האימות', 'error');
+    } finally {
+      setIsPwdVerifyLoading(false);
+    }
+  };
+
+  const handleSaveNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || !confirmNewPassword) {
+      triggerToast('אנא מלא את כל השדות', 'warning');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      triggerToast('הסיסמאות החדשות אינן תואמות!', 'error');
+      return;
+    }
+    if (newPassword.length < 4) {
+      triggerToast('הסיסמה החדשה חייבת להכיל לפחות 4 תווים', 'warning');
+      return;
+    }
+
+    try {
+      const updatedSettings = { ...settings, managerPassword: newPassword };
+      await setDoc(doc(db, 'settings', 'config'), updatedSettings);
+      setSettings(updatedSettings);
+      triggerToast('סיסמת המנהל עודכנה בהצלחה בתוך Firebase!', 'success');
+      // Reset password change UI state
+      setIsPwdEmailVerified(false);
+      setIsPwdOtpSent(false);
+      setPwdOtpCode('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה בשמירת הסיסמה ב-Firebase', 'error');
     }
   };
 
@@ -934,61 +1021,52 @@ export default function App() {
           ) : (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="block text-xs font-bold text-slate-500">דוא"ל מנהל המוגדר במערכת</label>
-                  {otpSent && (
-                    <button
-                      type="button"
-                      onClick={() => { setOtpSent(false); setLoginCode(''); }}
-                      className="text-xs text-blue-600 hover:underline font-semibold"
-                    >
-                      שנה מייל
-                    </button>
-                  )}
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center mb-4">
+                  <span className="block text-xs text-slate-400 mb-1">קוד האימות יישלח לכתובת המייל הרשומה של מנהל הת"ת:</span>
+                  <strong className="block text-sm text-slate-800 font-bold tracking-wide break-all">
+                    {settings.managerEmail || 'shey7048@gmail.com'}
+                  </strong>
                 </div>
-                
-                <div className="flex gap-2">
-                  <input 
-                    type="email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="הזן אימייל..."
-                    className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold text-slate-800"
-                    required
-                    disabled={otpSent}
-                  />
-                  {!otpSent && (
-                    <button
-                      type="button"
-                      onClick={handleSendOtp}
-                      disabled={otpLoading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 rounded-xl shadow-sm transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50"
-                    >
-                      {otpLoading ? 'שולח...' : 'שלח קוד'}
-                    </button>
-                  )}
-                </div>
-                {otpSent && (
-                  <span className="text-[10px] text-emerald-600 font-semibold mt-1 block leading-normal">
-                     נשלח קוד אימות חד-פעמי למייל! אנא בדוק את תיבת הדואר הנכנס.
-                  </span>
+
+                {!otpSent ? (
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={otpLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mb-2"
+                  >
+                    {otpLoading ? 'שולח קוד אימות...' : 'שלח קוד אימות חד-פעמי למייל'}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <span className="text-xs text-emerald-600 font-semibold text-center block bg-emerald-50 py-2 px-3 rounded-lg border border-emerald-100">
+                      ✓ קוד אימות חד-פעמי נשלח למייל המנהל!
+                    </span>
+                    
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="block text-xs font-bold text-slate-500">הזן קוד אימות בן 6 ספרות</label>
+                        <button
+                          type="button"
+                          onClick={() => { setOtpSent(false); setLoginCode(''); }}
+                          className="text-xs text-blue-600 hover:underline font-semibold"
+                        >
+                          שלח שוב
+                        </button>
+                      </div>
+                      <input 
+                        type="text"
+                        maxLength={6}
+                        value={loginCode}
+                        onChange={(e) => setLoginCode(e.target.value)}
+                        placeholder="------"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-center tracking-[8px] text-lg font-bold text-slate-800"
+                        required
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {otpSent && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">הזן קוד אימות בן 6 ספרות</label>
-                  <input 
-                    type="text"
-                    maxLength={6}
-                    value={loginCode}
-                    onChange={(e) => setLoginCode(e.target.value)}
-                    placeholder="------"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-center tracking-[8px] text-lg font-bold text-slate-800"
-                    required
-                  />
-                </div>
-              )}
 
               <button
                 type="submit"
@@ -1483,11 +1561,17 @@ export default function App() {
               </div>
               
               <button
-                onClick={() => {
-                  if(confirm('האם ברצונך למחוק לצמיתות את כל היסטוריית המכירות?')) {
-                    // Simulating log sweep, actually saved in DB on backend settings resetting
-                    setSalesLogs([]);
-                    triggerToast('יומן המכירות אופס', 'info');
+                onClick={async () => {
+                  if(confirm('האם ברצונך למחוק לצמיתות את כל היסטוריית המכירות מתוך Firebase? פעולה זו סופית ולא ניתנת לביטול.')) {
+                    try {
+                      triggerToast('מוחק יומן מכירות מ-Firebase...', 'info');
+                      const promises = salesLogs.map(log => deleteDoc(doc(db, 'sales', log.id)));
+                      await Promise.all(promises);
+                      triggerToast('כל יומן המכירות נמחק בהצלחה לצמיתות!', 'success');
+                    } catch (err) {
+                      console.error(err);
+                      triggerToast('שגיאה במחיקת יומן המכירות', 'error');
+                    }
                   }
                 }}
                 className="text-xs text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 font-bold transition-all cursor-pointer flex items-center gap-1"
@@ -1592,23 +1676,9 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Manager portal password field */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <SlidersHorizontal className="h-4 w-4 text-blue-500" />
-                    <span>סיסמת כניסה למנהל (סיסמת Firebase)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.managerPassword || '1234'}
-                    onChange={(e) => setSettings({ ...settings, managerPassword: e.target.value })}
-                    placeholder="הקלד סיסמה חדשה (ברירת מחדל: 1234)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800"
-                    required
-                  />
-                  <span className="text-[10px] text-slate-400 mt-1 block leading-normal">
-                    סיסמת המנהל תתעדכן ישירות ב-Firebase ומאפשרת לשנות את ה-1,2,3,4 הבסיסית בצורה נקייה ומאובטחת.
-                  </span>
+                {/* Placeholder empty div to preserve clean layout since password is now in a distinct safe block below */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-center text-center opacity-60">
+                  <span className="text-xs text-slate-400">הגדרות אבטחה מתקדמות וסודיות מנוהלות בצורה בטוחה בתיבה נפרדת מטה.</span>
                 </div>
 
               </div>
@@ -1666,6 +1736,129 @@ export default function App() {
                 </button>
               </div>
             </form>
+
+            {/* SECURE PASSWORD CHANGING SYSTEM - REQUIRES OTP CONFIRMATION */}
+            <div className="border-t border-slate-100 pt-6 mt-6 space-y-4">
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                  <SlidersHorizontal className="h-4.5 w-4.5 text-blue-600" />
+                  <span>שינוי סיסמת מנהל בטוח (מאומת מייל)</span>
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">למען אבטחה מרבית, שינוי סיסמת הכניסה למנהל מחייב אימות אימייל אקטיבי של מנהל הת"ת.</p>
+              </div>
+
+              {!isPwdEmailVerified ? (
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-4">
+                  <div className="text-xs text-slate-500 leading-relaxed">
+                    כדי להציג את <strong className="text-slate-700">הסיסמה הישנה</strong> ולפתוח את האפשרות לעדכן לסיסמה חדשה, לחץ על הכפתור כדי לשלוח קוד אימות חד-פעמי (OTP) לכתובת המוגדרת <strong className="font-mono text-slate-700">{settings.managerEmail || 'shey7048@gmail.com'}</strong>:
+                  </div>
+
+                  {!isPwdOtpSent ? (
+                    <button
+                      type="button"
+                      onClick={handleSendPwdOtp}
+                      disabled={isPwdOtpLoading}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isPwdOtpLoading ? 'שולח קוד אימות...' : 'שלח קוד אימות למייל'}
+                    </button>
+                  ) : (
+                    <form onSubmit={handleVerifyPwdOtp} className="space-y-3">
+                      <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs p-3 rounded-lg font-bold">
+                        ✓ קוד אימות נשלח בהצלחה! אנא בדוק את תיבת הדואר והזן אותו מטה.
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={pwdOtpCode}
+                          onChange={(e) => setPwdOtpCode(e.target.value)}
+                          placeholder="קוד בן 6 ספרות"
+                          className="px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800 tracking-wider text-center"
+                          required
+                        />
+                        <button
+                          type="submit"
+                          disabled={isPwdVerifyLoading}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          {isPwdVerifyLoading ? 'מאמת...' : 'אמת קוד והצג סיסמה'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 space-y-4">
+                  <div className="flex items-center gap-2 text-emerald-800">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    <span className="text-xs font-black">האימות עבר בהצלחה! הסיסמה הישנה גלויה כעת.</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center bg-white p-4 rounded-xl border border-emerald-100">
+                    <div>
+                      <span className="block text-[10px] uppercase text-slate-400 font-bold mb-0.5">סיסמה ישנה/נוכחית במערכת</span>
+                      <code className="text-sm font-mono font-black text-rose-600 bg-rose-50 px-2 py-1 rounded">
+                        {settings.managerPassword || '1234'}
+                      </code>
+                    </div>
+                    <div className="sm:col-span-2 text-xs text-slate-400 leading-normal">
+                      סיסמה זו משמשת כעת לכניסה למערכת. היא תתעדכן ברגע שתשמור את הסיסמה החדשה מטה.
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveNewPassword} className="space-y-4 my-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">הזן סיסמה חדשה</label>
+                        <input
+                          type="text"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="מינימום 4 תווים"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">אמת/אשר את הסיסמה החדשה</label>
+                        <input
+                          type="text"
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          placeholder="הקלד סיסמה שנית"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-emerald-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPwdEmailVerified(false);
+                          setIsPwdOtpSent(false);
+                          setPwdOtpCode('');
+                          setNewPassword('');
+                          setConfirmNewPassword('');
+                        }}
+                        className="text-xs text-slate-400 hover:text-slate-600 font-bold"
+                      >
+                        ביטול
+                      </button>
+                      <button
+                        type="submit"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-5 rounded-xl shadow transition-all cursor-pointer text-xs"
+                      >
+                        שמור סיסמה חדשה
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+
           </section>
         )}
 

@@ -222,6 +222,7 @@ async function sendStockAlertEmail(item: ClothesItem, sizeName: string, currentQ
     });
   } catch (err) {
     console.error("Failed to dispatcher SMTP stock alert email:", err);
+    throw err;
   }
 }
 
@@ -235,7 +236,7 @@ app.post('/api/send-alert', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to dispatcher alert SMTP mail:", err);
-    res.status(500).json({ error: "Failed to dispatch alert email" });
+    res.status(500).json({ error: "שגיאה בשליחת מייל הבדיקה. וודא כי פרטי ה-SMTP (EMAIL_USER & EMAIL_PASS) מוגדרים כהלכה בלוח הסודות." });
   }
 });
 
