@@ -73,6 +73,8 @@ export default function App() {
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'qty-desc' | 'qty-asc'>('newest');
   const [minusAction, setMinusAction] = useState<'sale' | 'correct'>('sale');
   const [logoError, setLogoError] = useState<boolean>(false);
+  const [failedItemImageIds, setFailedItemImageIds] = useState<Record<string, boolean>>({});
+  const [customLogoPreviewError, setCustomLogoPreviewError] = useState<boolean>(false);
 
   // Modals management
   const [isItemModalOpen, setIsItemModalOpen] = useState<boolean>(false);
@@ -995,21 +997,51 @@ export default function App() {
   // Logo fallback handler
   const activeLogoUrl = (settings.customLogoUrl && !settings.customLogoUrl.includes('logo.svg') && settings.customLogoUrl.trim() !== '') ? settings.customLogoUrl : logoUrl;
 
+  // Reset errors on logo configuration change
+  useEffect(() => {
+    setLogoError(false);
+  }, [activeLogoUrl]);
+
+  useEffect(() => {
+    setCustomLogoPreviewError(false);
+  }, [settings.customLogoUrl]);
+
+  // Unified premium logo renderer with safe fallback
+  const renderLogo = (sizeCls: string = "h-24") => {
+    if (logoError) {
+      return (
+        <div className="flex flex-col items-center justify-center -space-y-0.5 border border-amber-300 bg-amber-50/50 rounded-2xl p-3 shadow-inner text-center font-bold select-none min-w-[130px] max-w-[160px] mx-auto">
+          <span className="text-base font-black text-slate-900 tracking-widest">ת"ת</span>
+          <span className="text-[10px] text-amber-600 font-extrabold whitespace-nowrap">כנסת יחזקאל</span>
+        </div>
+      );
+    }
+    return (
+      <img 
+        src={activeLogoUrl} 
+        alt="לוגו תת כנסת יחזקאל" 
+        referrerPolicy="no-referrer"
+        className={`${sizeCls} w-auto object-contain mx-auto transition-all duration-300`}
+        onError={() => setLogoError(true)}
+      />
+    );
+  };
+
   // RENDER INTERFACE
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 flex items-center justify-center p-4 relative" dir="rtl">
-        {/* Subtle decorative background lights */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full filter blur-[100px] pointer-events-none"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-[100px] pointer-events-none"></div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
+        {/* Subtle decorative background lights in light theme */}
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-amber-400/5 rounded-full filter blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full filter blur-[120px] pointer-events-none"></div>
 
         {/* Toast notifications */}
         {toast && (
           <div className="fixed top-5 left-5 z-50 max-w-sm w-full transition-all duration-300">
             <div className={`p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 text-white ${
-              toast.type === 'error' ? 'bg-red-600 border-red-500' :
+              toast.type === 'error' ? 'bg-rose-600 border-rose-500' :
               toast.type === 'warning' ? 'bg-amber-600 border-amber-500' :
-              toast.type === 'info' ? 'bg-indigo-600 border-indigo-500' : 'bg-emerald-600 border-emerald-500'
+              toast.type === 'info' ? 'bg-slate-900 border-slate-800' : 'bg-emerald-600 border-emerald-500'
             }`}>
               <span className="text-sm font-semibold">{toast.message}</span>
               <button onClick={() => setToast(null)} className="text-white hover:text-slate-100">
@@ -1019,37 +1051,30 @@ export default function App() {
           </div>
         )}
 
-        <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)] p-8 max-w-md w-full border border-slate-200/55 relative overflow-hidden transition-all duration-300">
+        <div className="bg-white rounded-3xl shadow-[0_32px_80px_-16px_rgba(148,163,184,0.3)] p-8 max-w-md w-full border border-slate-100 relative overflow-hidden transition-all duration-300">
           {/* Top aesthetic gold gradient trim */}
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600"></div>
 
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center mb-5 p-1 bg-slate-50 rounded-2xl border border-slate-100/80 shadow-inner">
-              <img 
-                src={activeLogoUrl} 
-                alt="לוגו תת כנסת יחזקאל" 
-                className="h-28 w-auto object-contain mx-auto"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = logoUrl;
-                }}
-              />
+            <div className="inline-flex items-center justify-center mb-5 p-2.5 bg-slate-50/50 rounded-2xl border border-slate-100 shadow-inner w-44 h-24 overflow-hidden">
+              {renderLogo("h-16")}
             </div>
             
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">חדר מכירות ת"ת כנסת יחזקאל</h1>
-            <p className="text-slate-500 text-xs font-semibold">מערכת בקרת מלאי וכניסה מאובטחת למורשים בלבד</p>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1.5">חדר מכירות ת"ת כנסת יחזקאל</h1>
+            <p className="text-slate-500 text-xs font-bold">מערכת בקרת מלאי וכניסה מאובטחת</p>
           </div>
 
           {/* Login tab switcher */}
-          <div className="flex bg-slate-100/80 p-1 rounded-2xl mb-6 border border-slate-200/40">
+          <div className="flex bg-slate-100/80 p-1 rounded-2xl mb-6 border border-slate-250/20">
             <button
               onClick={() => { setLoginMethod('password'); setAuthError(false); }}
-              className={`flex-1 text-center py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 cursor-pointer ${loginMethod === 'password' ? 'bg-slate-900 text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`flex-1 text-center py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 cursor-pointer ${loginMethod === 'password' ? 'bg-white text-amber-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
             >
               התחברות עם סיסמה
             </button>
             <button
               onClick={() => { setLoginMethod('email'); setAuthError(false); }}
-              className={`flex-1 text-center py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 cursor-pointer ${loginMethod === 'email' ? 'bg-slate-900 text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`flex-1 text-center py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 cursor-pointer ${loginMethod === 'email' ? 'bg-white text-amber-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
             >
               אימות במייל (OTP)
             </button>
@@ -1153,13 +1178,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen text-slate-900 flex flex-col bg-slate-50/60" dir="rtl">
+    <div className="min-h-screen text-slate-900 flex flex-col bg-slate-50/50" dir="rtl">
       
       {/* Toast systems */}
       {toast && (
         <div className="fixed top-5 left-5 z-50 max-w-sm w-full transition-all duration-300">
           <div className={`p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 text-white ${
-            toast.type === 'error' ? 'bg-red-600 border-red-500' :
+            toast.type === 'error' ? 'bg-rose-600 border-rose-500' :
             toast.type === 'warning' ? 'bg-amber-600 border-amber-500' :
             toast.type === 'info' ? 'bg-slate-900 border-slate-800' : 'bg-emerald-600 border-emerald-500'
           }`}>
@@ -1171,60 +1196,53 @@ export default function App() {
         </div>
       )}
 
-      {/* Main header block in Royal Navy and Gold */}
-      <header className="bg-slate-950 text-white border-b border-amber-500/20 sticky top-0 z-40 shadow-xl">
+      {/* Main header block in Royal Prestige Light Theme */}
+      <header className="bg-white text-slate-950 border-b border-amber-200/60 sticky top-0 z-40 shadow-[0_4px_24px_rgba(148,163,184,0.06)]">
         {/* Subtle decorative gold streak */}
         <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 w-full"></div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-22">
             <div className="flex items-center gap-4 py-2">
-              <div className="flex items-center min-w-[55px] justify-center p-1.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 shadow-md">
-                <img 
-                  src={activeLogoUrl} 
-                  alt="לוגו תת כנסת יחזקאל" 
-                  className="h-14 w-auto object-contain max-h-[56px]"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = logoUrl;
-                  }}
-                />
+              <div className="flex items-center min-w-[65px] h-14 justify-center p-1.5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner overflow-hidden">
+                {renderLogo("h-10")}
               </div>
               <div>
-                <span className="text-lg sm:text-2xl font-black text-white tracking-tight block drop-shadow-sm text-gradient bg-gradient-to-r from-white via-slate-100 to-amber-200 bg-clip-text">חדר מכירות ת"ת כנסת יחזקאל</span>
-                <span className="text-xs text-amber-400 font-bold block mt-0.5 tracking-wider">ממשק משולב • ניהול מלאי ויומן רווחים</span>
+                <span className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight block">חדר מכירות ת"ת כנסת יחזקאל</span>
+                <span className="text-xs text-amber-600 font-extrabold block mt-0.5 tracking-wider">ממשק משולב • ניהול מלאי ויומן רווחים</span>
               </div>
             </div>
 
             {/* Header Action bar */}
             <div className="flex items-center gap-4">
-              <div className="hidden md:flex items-center bg-slate-900 border border-slate-800 p-1.5 rounded-2xl">
+              <div className="hidden md:flex items-center bg-slate-100/90 border border-slate-200/60 p-1 rounded-2xl">
                 <button
                   onClick={() => setActiveTab('inventory')}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 ${activeTab === 'inventory' ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md transform scale-102 font-black' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer ${activeTab === 'inventory' ? 'bg-white text-amber-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}
                 >
                   מלאי פריטים
                 </button>
                 <button
                   onClick={() => setActiveTab('sales')}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 ${activeTab === 'sales' ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md transform scale-102 font-black' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer ${activeTab === 'sales' ? 'bg-white text-amber-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}
                 >
                   יומן מכירות
                 </button>
                 <button
                   onClick={() => setActiveTab('settings')}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 ${activeTab === 'settings' ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md transform scale-102 font-black' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer ${activeTab === 'settings' ? 'bg-white text-amber-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}
                 >
                   הגדרות והתראות
                 </button>
               </div>
 
-              <div className="h-6 w-px bg-slate-800 hidden md:block"></div>
+              <div className="h-6 w-px bg-slate-200 hidden md:block"></div>
 
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 text-slate-400 hover:text-rose-400 hover:bg-white/5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer border border-transparent hover:border-slate-800"
+                className="flex items-center gap-2 text-slate-500 hover:text-rose-600 hover:bg-slate-50 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer border border-transparent hover:border-slate-100"
               >
-                <LogOut className="h-4 w-4 text-amber-500" />
+                <LogOut className="h-4 w-4 text-amber-600" />
                 <span className="hidden sm:inline">התנתק</span>
               </button>
             </div>
@@ -1232,25 +1250,25 @@ export default function App() {
         </div>
       </header>
 
-      {/* Responsive mobile sub-bar in Royal navy */}
-      <div className="md:hidden bg-slate-950 text-white border-b border-amber-500/10 flex p-1.5 sticky top-[89px] z-30 justify-around shadow-lg">
+      {/* Responsive mobile sub-bar in Royal light */}
+      <div className="md:hidden bg-white text-slate-900 border-b border-amber-200/50 flex p-1.5 sticky top-[89px] z-30 justify-around shadow-sm">
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'inventory' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400'}`}
+          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'inventory' ? 'bg-slate-50 text-amber-600 font-black border border-slate-200/60 shadow-inner' : 'text-slate-500'}`}
         >
           <Shirt className="h-4 w-4" />
           <span>מלאי</span>
         </button>
         <button
           onClick={() => setActiveTab('sales')}
-          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'sales' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400'}`}
+          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'sales' ? 'bg-slate-50 text-amber-600 font-black border border-slate-200/60 shadow-inner' : 'text-slate-500'}`}
         >
           <History className="h-4 w-4" />
           <span>יומן מכירות</span>
         </button>
         <button
           onClick={() => setActiveTab('settings')}
-          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400'}`}
+          className={`px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-slate-50 text-amber-600 font-black border border-slate-200/60 shadow-inner' : 'text-slate-500'}`}
         >
           <Settings className="h-4 w-4" />
           <span>הגדרות</span>
@@ -1487,24 +1505,32 @@ export default function App() {
                 const isOutOfStock = totalStock === 0;
                 const isLowStock = totalStock <= item.minStock;
 
-                const defaultPlaceholder = logoUrl;
-                const isNoImage = !item.imageUrl;
-                const previewImgSource = item.imageUrl || defaultPlaceholder;
+                const hasImageFailed = failedItemImageIds[item.id];
+                const shouldShowImage = item.imageUrl && !hasImageFailed;
 
                 return (
                   <div key={item.id} className="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(148,163,184,0.12)] hover:shadow-[0_12px_30px_-4px_rgba(148,163,184,0.2)] transition-all duration-300 hover:-translate-y-1 flex flex-col overflow-hidden relative group">
                     
                     {/* Upper image and metadata badge */}
                     <div className="h-52 bg-slate-50 relative overflow-hidden flex items-center justify-center border-b border-slate-100">
-                      <img 
-                        src={previewImgSource} 
-                        alt={item.name} 
-                        className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${isNoImage ? 'object-contain p-8 bg-slate-50' : 'object-cover'}`}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = defaultPlaceholder;
-                          (e.target as HTMLImageElement).className = "w-full h-full object-contain p-8 bg-slate-50 transition-transform duration-500 group-hover:scale-105";
-                        }}
-                      />
+                      {shouldShowImage ? (
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.name} 
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          onError={() => {
+                            setFailedItemImageIds(prev => ({ ...prev, [item.id]: true }));
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-slate-50/80 flex flex-col items-center justify-center p-8 text-center select-none">
+                          <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200/50 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform duration-300 shadow-sm">
+                            <Shirt className="h-8 w-8 text-amber-500" />
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-bold mt-2">אין תמונה להצגה</span>
+                        </div>
+                      )}
                       
                       <span className="absolute top-3 right-3 bg-white/95 backdrop-blur-md text-slate-700 px-3 py-1 rounded-xl text-xs font-bold shadow-sm border border-slate-200/40">
                         {item.category}
@@ -1711,7 +1737,7 @@ export default function App() {
           <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto space-y-6">
             <div>
               <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
-                <Settings className="h-5 w-5 text-blue-600" />
+                <Settings className="h-5 w-5 text-amber-600" />
                 <span>הגדרות קונפיגורציה, מיתוג והתראות מייל</span>
               </h3>
               <p className="text-xs text-slate-400 mt-1">נהל את יעדי הדוח, כמות האזהרות המינימליות, נתוני המייל של מנהל הת"ת וכתובות הלוגו.</p>
@@ -1723,7 +1749,7 @@ export default function App() {
                 {/* Manager notification email targets */}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <Mail className="h-4 w-4 text-blue-500" />
+                    <Mail className="h-4 w-4 text-amber-600" />
                     <span>אימייל לקבלת התראות מלאי של הת"ת</span>
                   </label>
                   <input
@@ -1731,7 +1757,7 @@ export default function App() {
                     value={settings.managerEmail}
                     onChange={(e) => setSettings({ ...settings, managerEmail: e.target.value })}
                     placeholder="למשל: manager@tt.org"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-semibold text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-800"
                     required
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block leading-normal">
@@ -1743,7 +1769,7 @@ export default function App() {
                 <div className="space-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100 col-span-1 md:col-span-2">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                      <ImageIcon className="h-4 w-4 text-blue-500" />
+                      <ImageIcon className="h-4 w-4 text-amber-600" />
                       <span>סמל הלוגו של הת"ת</span>
                     </label>
                     <p className="text-[10px] text-slate-400">באפשרותך להעלות תמונה מהמחשב או להזין קישור אינטרנט ישיר.</p>
@@ -1752,15 +1778,22 @@ export default function App() {
                   {/* Logo Image Preview Block */}
                   {settings.customLogoUrl && (
                     <div className="flex items-center gap-3 p-3 bg-white border border-slate-150 rounded-xl">
-                      <img 
-                        src={settings.customLogoUrl} 
-                        alt="Logo Preview" 
-                        className="h-10 object-contain bg-slate-50 p-1 rounded border border-slate-100 max-w-[120px]" 
-                        onError={(e) => {
-                          // Fallback if preview fails
-                          (e.target as any).src = logoUrl;
-                        }}
-                      />
+                      {!customLogoPreviewError ? (
+                        <img 
+                          src={settings.customLogoUrl} 
+                          alt="Logo Preview" 
+                          referrerPolicy="no-referrer"
+                          className="h-10 object-contain bg-slate-50 p-1 rounded border border-slate-100 max-w-[120px]" 
+                          onError={() => {
+                            setCustomLogoPreviewError(true);
+                          }}
+                        />
+                      ) : (
+                        <div className="h-10 px-2.5 bg-amber-50 text-amber-700 font-extrabold text-[10px] rounded border border-amber-200 flex items-center justify-center">
+                          שגיאת טעינה
+                        </div>
+                      )}
+                      
                       <div className="flex-1 min-w-0">
                         <span className="block text-[10px] font-bold text-slate-400 uppercase">תצוגה מקדימה של הלוגו</span>
                         <span className="block text-xs font-semibold text-slate-600 truncate">
@@ -1784,9 +1817,9 @@ export default function App() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                     {/* Option A: Direct File Upload */}
                     <div className="relative">
-                      <label className="block text-[11px] font-bold text-slate-505 mb-1 text-slate-500">העלה קובץ תמונה (PNG/JPG)</label>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">העלה קובץ תמונה (PNG/JPG)</label>
                       <div className="flex items-center justify-center w-full">
-                        <label className="flex flex-col items-center justify-center w-full h-12 border border-slate-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 hover:border-blue-400 transition-all">
+                        <label className="flex flex-col items-center justify-center w-full h-12 border border-slate-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 hover:border-amber-400 transition-all">
                           <div className="flex items-center gap-2">
                             <Upload className="w-4 h-4 text-slate-400" />
                             <span className="text-xs font-bold text-slate-500">לחץ לבחירת קובץ</span>
@@ -1809,7 +1842,7 @@ export default function App() {
                         value={settings.customLogoUrl}
                         onChange={(e) => setSettings({ ...settings, customLogoUrl: e.target.value })}
                         placeholder="למשל: https://site.com/logo.png"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs font-semibold text-left text-slate-800"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-left text-slate-800"
                       />
                     </div>
                   </div>
@@ -1829,7 +1862,7 @@ export default function App() {
                   id="alertToggle"
                   checked={settings.lowStockAlertActive}
                   onChange={(e) => setSettings({ ...settings, lowStockAlertActive: e.target.checked })}
-                  className="h-4.5 w-4.5 rounded text-blue-600 focus:ring-blue-550 border-slate-300 mt-0.5 cursor-pointer"
+                  className="h-4.5 w-4.5 rounded text-amber-600 focus:ring-amber-500/30 border-slate-300 mt-0.5 cursor-pointer"
                 />
                 <div>
                   <label htmlFor="alertToggle" className="block text-sm font-bold text-slate-700 cursor-pointer">
@@ -1844,7 +1877,7 @@ export default function App() {
               {/* Verification dispatch tester */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <span className="block text-sm font-bold text-slate-705 text-slate-800">בדיקת תקינות התראות וסנכרון מיילים</span>
+                  <span className="block text-sm font-bold text-slate-700">בדיקת תקינות התראות וסנכרון מיילים</span>
                   <span className="text-xs block text-slate-400">שלח דוא"ל נסיוני מעוצב לכתובת המוגדרת לעיל כדי לוודא קבלה.</span>
                 </div>
                 <button
@@ -1858,9 +1891,9 @@ export default function App() {
               </div>
 
               {/* Info text */}
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-blue-800 text-xs leading-relaxed">
-                <p className="font-bold flex items-center gap-1.5 mb-1 text-blue-900">
-                  <CheckCircle2 className="h-4 w-4" />
+              <div className="bg-amber-50/40 p-4 rounded-xl border border-amber-200/50 text-amber-800 text-xs leading-relaxed">
+                <p className="font-bold flex items-center gap-1.5 mb-1 text-amber-900">
+                  <CheckCircle2 className="h-4 w-4 text-amber-600" />
                   <span>אינטגרציה חסינה מפני נפילות!</span>
                 </p>
                 אם פרטי שרת המייל (EMAIL_USER & EMAIL_PASS) שלכם טרם הוכנסו בלוח הסודות (Secrets Panel) באיי Studio, המערכת תבצע פלט (Output Log) דמה מלא של המיילים לטרמינל הפנימי של השרת במקום לקרוס. מלאו את הכתובת שלכם ותוכלו לחבר את פרטי ה-SMTP בהמשך בשיא הבטיחות!
@@ -1869,7 +1902,7 @@ export default function App() {
               <div className="flex justify-end pt-2 border-t border-slate-100">
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition-all cursor-pointer"
+                  className="bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-extrabold py-2.5 px-6 rounded-xl shadow transition-all cursor-pointer border border-amber-500/10 text-xs"
                 >
                   שמור הגדרות מנהל
                 </button>
@@ -1880,7 +1913,7 @@ export default function App() {
             <div className="border-t border-slate-100 pt-6 mt-6 space-y-4">
               <div>
                 <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                  <SlidersHorizontal className="h-4.5 w-4.5 text-blue-600" />
+                  <SlidersHorizontal className="h-4.5 w-4.5 text-amber-600" />
                   <span>שינוי סיסמת מנהל בטוח (מאומת מייל)</span>
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">למען אבטחה מרבית, שינוי סיסמת הכניסה למנהל מחייב אימות אימייל אקטיבי של מנהל הת"ת.</p>
@@ -1897,7 +1930,7 @@ export default function App() {
                       type="button"
                       onClick={handleSendPwdOtp}
                       disabled={isPwdOtpLoading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                      className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs py-2 px-4 rounded-xl shadow transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                     >
                       {isPwdOtpLoading ? 'שולח קוד אימות...' : 'שלח קוד אימות למייל'}
                     </button>
@@ -1913,7 +1946,7 @@ export default function App() {
                           value={pwdOtpCode}
                           onChange={(e) => setPwdOtpCode(e.target.value)}
                           placeholder="קוד בן 6 ספרות"
-                          className="px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800 tracking-wider text-center"
+                          className="px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm font-bold text-slate-800 tracking-wider text-center"
                           required
                         />
                         <button
@@ -1955,7 +1988,7 @@ export default function App() {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="מינימום 4 תווים"
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-bold text-slate-800"
                           required
                         />
                       </div>
@@ -1966,7 +1999,7 @@ export default function App() {
                           value={confirmNewPassword}
                           onChange={(e) => setConfirmNewPassword(e.target.value)}
                           placeholder="הקלד סיסמה שנית"
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm font-bold text-slate-800"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-bold text-slate-800"
                           required
                         />
                       </div>
@@ -2034,7 +2067,7 @@ export default function App() {
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="למשל: חולצת פולו אלגנט"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-850"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-850"
                     required
                   />
                 </div>
@@ -2045,7 +2078,7 @@ export default function App() {
                     value={formSku}
                     onChange={(e) => setFormSku(e.target.value)}
                     placeholder="למשל: PL-1029"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-850"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-850"
                     required
                   />
                 </div>
@@ -2057,7 +2090,7 @@ export default function App() {
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-705"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-705"
                     required
                   >
                     {categories.map(c => (
@@ -2072,7 +2105,7 @@ export default function App() {
                     value={formColor}
                     onChange={(e) => setFormColor(e.target.value)}
                     placeholder="למשל: כחול כהה"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-850"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-850"
                     required
                   />
                 </div>
@@ -2087,7 +2120,7 @@ export default function App() {
                     value={formCost}
                     onChange={(e) => setFormCost(Number(e.target.value))}
                     placeholder="0"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-850"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-850"
                     required
                   />
                 </div>
@@ -2099,7 +2132,7 @@ export default function App() {
                     value={formSell}
                     onChange={(e) => setFormSell(Number(e.target.value))}
                     placeholder="0"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-850"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-850"
                     required
                   />
                 </div>
@@ -2111,7 +2144,7 @@ export default function App() {
                     value={formMinStock}
                     onChange={(e) => setFormMinStock(Number(e.target.value))}
                     placeholder="5"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-850"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-850"
                     required
                   />
                 </div>
@@ -2197,7 +2230,7 @@ export default function App() {
                 <button type="button" onClick={closeItemModal} className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 rounded-xl transition-all cursor-pointer">
                   ביטול
                 </button>
-                <button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-6 rounded-xl transition-all cursor-pointer shadow">
+                <button type="submit" className="bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-extrabold py-2 px-6 rounded-xl border border-amber-500/10 transition-all cursor-pointer shadow text-xs">
                   שמור פריט
                 </button>
               </div>
@@ -2234,7 +2267,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={handleAddCategory}
-                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition-all shrink-0 h-[34px] cursor-pointer"
+                  className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold py-2 px-4 rounded-lg text-xs transition-all shrink-0 h-[34px] cursor-pointer border border-amber-500/10"
                 >
                   הוסף
                 </button>
@@ -2264,7 +2297,7 @@ export default function App() {
             </div>
 
             <div className="p-4 border-t bg-slate-50 flex justify-end">
-              <button onClick={() => setIsCategoryModalOpen(false)} className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs cursor-pointer">
+              <button onClick={() => setIsCategoryModalOpen(false)} className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold py-1.5 px-4 rounded-lg text-xs cursor-pointer border border-amber-500/10">
                 סגור
               </button>
             </div>
@@ -2335,7 +2368,7 @@ export default function App() {
             </div>
 
             <div className="p-4 border-t bg-slate-50 flex justify-end">
-              <button onClick={() => setIsLowStockModalOpen(false)} className="bg-sky-600 text-white font-bold py-2 px-6 rounded-xl text-xs cursor-pointer shadow">
+              <button onClick={() => setIsLowStockModalOpen(false)} className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold py-2 px-6 rounded-xl text-xs cursor-pointer shadow border border-amber-500/10">
                 סגור דוח
               </button>
             </div>
