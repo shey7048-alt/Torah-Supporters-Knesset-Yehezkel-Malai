@@ -92,14 +92,14 @@ const initialSampleClothes: ClothesItem[] = [
 
 const defaultSettings: SystemSettings = {
   customLogoUrl: "https://torah-supporters-logo-q6t8y35io-aliko-s-projects.vercel.app/",
-  managerEmail: "shey7048@gmail.com",
+  managerEmail: "sp9328008@gmail.com",
   lowStockAlertActive: true,
   alertEmailSentFor: []
 };
 
 // Lazy initialize Nodemailer Transporter with adaptive configuration
 function getMailTransporter() {
-  const user = (process.env.EMAIL_USER || process.env.SMTP_USER || '').trim();
+  const user = (process.env.EMAIL_USER || process.env.SMTP_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com').trim();
   const pass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').trim();
   const host = (process.env.EMAIL_HOST || 'smtp.gmail.com').trim();
   const port = parseInt(process.env.EMAIL_PORT || '587');
@@ -227,7 +227,7 @@ async function sendStockAlertEmail(item: ClothesItem, sizeName: string, currentQ
 
   try {
     await transporter.sendMail({
-      from: `"ניהול מלאי כנסת יחזקאל" <${process.env.EMAIL_USER || 'no-reply@knesset-yechezkel.org'}>`,
+      from: `"ניהול מלאי כנסת יחזקאל" <${process.env.EMAIL_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com'}>`,
       to: managerEmail,
       subject,
       html: emailHtml,
@@ -307,7 +307,7 @@ app.post('/api/send-auth-code', async (req, res) => {
     `;
 
     await transporter.sendMail({
-      from: `"ניהול מלאי כנסת יחזקאל" <${process.env.EMAIL_USER || 'no-reply@knesset-yechezkel.org'}>`,
+      from: `"ניהול מלאי כנסת יחזקאל" <${process.env.EMAIL_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com'}>`,
       to: email,
       subject,
       html: emailHtml,

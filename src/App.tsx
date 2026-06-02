@@ -75,6 +75,8 @@ export default function App() {
   const [logoError, setLogoError] = useState<boolean>(false);
   const [failedItemImageIds, setFailedItemImageIds] = useState<Record<string, boolean>>({});
   const [customLogoPreviewError, setCustomLogoPreviewError] = useState<boolean>(false);
+  const [editingSizeQty, setEditingSizeQty] = useState<{ itemId: string; sizeName: string } | null>(null);
+  const [editQtyValue, setEditQtyValue] = useState<string>('');
 
   // Modals management
   const [isItemModalOpen, setIsItemModalOpen] = useState<boolean>(false);
@@ -222,7 +224,7 @@ export default function App() {
       } else {
         const defaultSet: SystemSettings = {
           customLogoUrl: logoUrl,
-          managerEmail: "shey7048@gmail.com",
+          managerEmail: "sp9328008@gmail.com",
           lowStockAlertActive: true,
           alertEmailSentFor: [],
           hasSeededItems: false,
@@ -259,7 +261,7 @@ export default function App() {
       }
     } else {
       // Email OTP code authentication - uses the system's fixed email
-      const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
+      const emailToUse = (settings.managerEmail || 'sp9328008@gmail.com').toLowerCase().trim();
       if (!loginCode) {
         triggerToast('נא להזין קוד אימות', 'error');
         return;
@@ -287,7 +289,7 @@ export default function App() {
   };
 
   const handleSendOtp = async () => {
-    const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
+    const emailToUse = (settings.managerEmail || 'sp9328008@gmail.com').toLowerCase().trim();
     setOtpLoading(true);
     try {
       const res = await fetch('/api/send-auth-code', {
@@ -404,6 +406,94 @@ export default function App() {
         }
 
         // Check if stock is restocked above minStock to clear duplicate alert lock
+        const alertKey = `${item.id}-${sizeName}`;
+        if (newQty > item.minStock && settings.alertEmailSentFor.includes(alertKey)) {
+          const updatedAlertKeys = settings.alertEmailSentFor.filter(k => k !== alertKey);
+          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `items/${item.id}`);
+        triggerToast('שגיאה בעדכון כמות המלאי', 'error');
+      }
+    }
+  };
+
+  const formatPrice = (val: number) => {
+    return Number(val).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  };
+
+  const handleDirectQtyChange = async (item: ClothesItem, sizeName: string, newQty: number) => {
+    const currentQty = item.sizes[sizeName] || 0;
+    if (newQty === currentQty) return;
+    if (newQty < 0) {
+      triggerToast('המלאי אינו יכול לרדת מתחת ל-0', 'error');
+      return;
+    }
+
+    const updatedSizes = { ...item.sizes, [sizeName]: newQty };
+    const updatedItem = { ...item, sizes: updatedSizes };
+
+    const diff = currentQty - newQty;
+
+    if (diff > 0 && minusAction === 'sale') {
+      const saleId = `sale-${Date.now()}`;
+      const sale: SaleLog = {
+        id: saleId,
+        itemId: item.id,
+        itemName: item.name,
+        sku: item.sku,
+        size: sizeName,
+        qty: diff,
+        costPrice: item.costPrice,
+        sellPrice: item.sellPrice,
+        profit: diff * (item.sellPrice - item.costPrice),
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(doc(db, 'sales', saleId), sale);
+        await setDoc(doc(db, 'items', item.id), updatedItem);
+
+        triggerToast(`נרשמה מכירה! 🛒 ${item.name} (${sizeName}) × ${diff} יח׳. רווח: ₪${(sale.profit).toFixed(2)}`, 'success');
+
+        const totalStock = sumStock(updatedItem.sizes);
+        const alertKey = `${item.id}-${sizeName}`;
+        if (newQty <= item.minStock && settings.lowStockAlertActive && !settings.alertEmailSentFor.includes(alertKey)) {
+          fetch('/api/send-alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              item: updatedItem, 
+              sizeName, 
+              currentQty: newQty, 
+              totalStock,
+              managerEmail: settings.managerEmail
+            })
+          })
+          .then(async (res) => {
+            if (res.ok) {
+              const updatedAlertKeys = [...settings.alertEmailSentFor, alertKey];
+              await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+              triggerToast(`נשלחה התראת חוסר במלאי למייל המנהל!`, 'info');
+              console.log("Low stock alert email sent successfully.");
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              console.error("SMTP alert failure:", errData.error);
+            }
+          })
+          .catch((err) => {
+            console.error("Network error sending low stock notification:", err);
+          });
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `sales/${saleId} or items/${item.id}`);
+        triggerToast('שגיאה ברישום המכירה במאגר', 'error');
+      }
+    } else {
+      try {
+        await setDoc(doc(db, 'items', item.id), updatedItem);
+        triggerToast(`המלאי של ${item.name} (${sizeName}) עודכן ל-${newQty} יח׳`, 'success');
+
         const alertKey = `${item.id}-${sizeName}`;
         if (newQty > item.minStock && settings.alertEmailSentFor.includes(alertKey)) {
           const updatedAlertKeys = settings.alertEmailSentFor.filter(k => k !== alertKey);
@@ -720,7 +810,7 @@ export default function App() {
 
   // Change password verification flows
   const handleSendPwdOtp = async () => {
-    const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
+    const emailToUse = (settings.managerEmail || 'sp9328008@gmail.com').toLowerCase().trim();
     setIsPwdOtpLoading(true);
     try {
       const res = await fetch('/api/send-auth-code', {
@@ -745,7 +835,7 @@ export default function App() {
 
   const handleVerifyPwdOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const emailToUse = (settings.managerEmail || 'shey7048@gmail.com').toLowerCase().trim();
+    const emailToUse = (settings.managerEmail || 'sp9328008@gmail.com').toLowerCase().trim();
     if (!pwdOtpCode.trim()) {
       triggerToast('אנא הזן קוד אימות', 'warning');
       return;
@@ -1115,7 +1205,7 @@ export default function App() {
                 <div className="bg-amber-50/50 border border-amber-200/40 p-4 rounded-2xl text-center mb-4">
                   <span className="block text-xs text-slate-500 mb-1.5">קוד האימות החד-פעמי יישלח לכתובת המייל המוגדרת:</span>
                   <strong className="block text-sm text-slate-800 font-extrabold tracking-wide break-all">
-                    {settings.managerEmail || 'shey7048@gmail.com'}
+                    {settings.managerEmail || 'sp9328008@gmail.com'}
                   </strong>
                 </div>
 
@@ -1309,7 +1399,7 @@ export default function App() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-slate-400 text-xs font-bold mb-1">שווי מלאי במחיר עלות</p>
-                <h3 className="text-2xl font-black text-emerald-600">₪{totalWholesaleValue.toLocaleString()}</h3>
+                <h3 className="text-2xl font-black text-emerald-600">₪{formatPrice(totalWholesaleValue)}</h3>
               </div>
               <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
                 <TrendingUp className="h-5 w-5 text-emerald-600" />
@@ -1343,7 +1433,7 @@ export default function App() {
             <div className="flex items-start justify-between">
               <div className="flex-grow">
                 <p className="text-slate-400 text-xs font-bold mb-1">רווח מצטבר ממכירות קופסא</p>
-                <h3 className="text-2xl font-black text-indigo-700">₪{totalAccumulatedProfit.toLocaleString()}</h3>
+                <h3 className="text-2xl font-black text-indigo-700">₪{formatPrice(totalAccumulatedProfit)}</h3>
                 <button 
                   onClick={handleResetProfit}
                   className="text-[10px] text-slate-400 hover:text-rose-600 font-bold mt-1.5 transition-colors flex items-center gap-1 cursor-pointer"
@@ -1567,15 +1657,15 @@ export default function App() {
                         <div className="grid grid-cols-3 gap-1 bg-slate-50/70 p-3 rounded-xl border border-slate-100/80 text-center mt-3">
                           <div className="flex flex-col justify-center">
                             <span className="text-[10px] text-slate-400 font-semibold leading-none mb-1">עלות רכש</span>
-                            <span className="text-xs font-black text-slate-705 text-slate-700">₪{item.costPrice}</span>
+                            <span className="text-xs font-black text-slate-705 text-slate-700">₪{formatPrice(item.costPrice)}</span>
                           </div>
                           <div className="border-r border-slate-200/60 flex flex-col justify-center">
                             <span className="text-[10px] text-slate-400 font-semibold leading-none mb-1">מחיר מכירה</span>
-                            <span className="text-xs font-black text-slate-900">₪{item.sellPrice}</span>
+                            <span className="text-xs font-black text-slate-900">₪{formatPrice(item.sellPrice)}</span>
                           </div>
                           <div className="border-r border-slate-200/60 flex flex-col justify-center">
                             <span className="text-[10px] text-slate-400 font-semibold leading-none mb-1">רווח נקי</span>
-                            <span className="text-xs font-black text-emerald-600">₪{item.sellPrice - item.costPrice}</span>
+                            <span className="text-xs font-black text-emerald-600">₪{formatPrice(item.sellPrice - item.costPrice)}</span>
                           </div>
                         </div>
                       </div>
@@ -1584,28 +1674,69 @@ export default function App() {
                       <div className="border-t border-b border-dashed border-slate-200/80 py-3.5">
                         <span className="text-[11px] font-extrabold text-slate-500 block mb-2 text-right">יתרת מלאי ועדכון מהיר לפי מידה:</span>
                         <div className="grid grid-cols-4 gap-2 max-h-44 overflow-y-auto pr-0.5 lg:grid-cols-4">
-                          {(Object.entries(item.sizes) as [string, number][]).map(([szName, qty]) => (
-                            <div key={szName} className="border border-slate-100 rounded-xl p-2 flex flex-col items-center justify-between bg-white shadow-sm hover:border-amber-400/50 transition-all duration-150 group/size relative">
-                              <span className="text-[10px] font-bold text-slate-500 block text-center truncate w-full" title={szName}>{szName}</span>
-                              <span className={`text-xs font-black my-1 ${qty === 0 ? 'text-rose-500' : qty <= 2 ? 'text-amber-600 font-black' : 'text-slate-850'}`}>{qty} יח'</span>
-                              <div className="flex gap-1 w-full justify-center">
-                                <button 
-                                  onClick={() => handleQuickStockChange(item, szName, -1)}
-                                  className="w-5 h-5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 text-slate-500 hover:text-rose-600 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
-                                  title="הפחת 1 יח'"
-                                >
-                                  -
-                                </button>
-                                <button 
-                                  onClick={() => handleQuickStockChange(item, szName, 1)}
-                                  className="w-5 h-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200/60 text-slate-500 hover:text-emerald-700 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
-                                  title="הוסף 1 יח'"
-                                >
-                                  +
-                                </button>
+                          {(Object.entries(item.sizes) as [string, number][]).map(([szName, qty]) => {
+                            const isEditing = editingSizeQty?.itemId === item.id && editingSizeQty?.sizeName === szName;
+                            return (
+                              <div key={szName} className="border border-slate-100 rounded-xl p-2 flex flex-col items-center justify-between bg-white shadow-sm hover:border-amber-400/50 transition-all duration-150 group/size relative">
+                                <span className="text-[10px] font-bold text-slate-500 block text-center truncate w-full" title={szName}>{szName}</span>
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="w-14 text-center text-xs font-black my-1 border border-amber-400 rounded bg-amber-50 text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500 py-0.5"
+                                    value={editQtyValue}
+                                    onChange={(e) => setEditQtyValue(e.target.value)}
+                                    autoFocus
+                                    onBlur={() => {
+                                      const val = parseInt(editQtyValue, 10);
+                                      if (!isNaN(val) && val >= 0) {
+                                        handleDirectQtyChange(item, szName, val);
+                                      }
+                                      setEditingSizeQty(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        const val = parseInt(editQtyValue, 10);
+                                        if (!isNaN(val) && val >= 0) {
+                                          handleDirectQtyChange(item, szName, val);
+                                        }
+                                        setEditingSizeQty(null);
+                                      } else if (e.key === 'Escape') {
+                                        setEditingSizeQty(null);
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <span 
+                                    onClick={() => {
+                                      setEditingSizeQty({ itemId: item.id, sizeName: szName });
+                                      setEditQtyValue(qty.toString());
+                                    }}
+                                    className={`text-xs font-black my-1 cursor-pointer hover:bg-amber-50 hover:text-amber-800 rounded px-1 transition-all ${qty === 0 ? 'text-rose-500' : qty <= 2 ? 'text-amber-600 font-black' : 'text-slate-850'}`}
+                                    title="לחץ להזנה ידנית"
+                                  >
+                                    {qty} יח'
+                                  </span>
+                                )}
+                                <div className="flex gap-1 w-full justify-center">
+                                  <button 
+                                    onClick={() => handleQuickStockChange(item, szName, -1)}
+                                    className="w-5 h-5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 text-slate-500 hover:text-rose-600 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
+                                    title="הפחת 1 יח'"
+                                  >
+                                    -
+                                  </button>
+                                  <button 
+                                    onClick={() => handleQuickStockChange(item, szName, 1)}
+                                    className="w-5 h-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200/60 text-slate-500 hover:text-emerald-700 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
+                                    title="הוסף 1 יח'"
+                                  >
+                                    +
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -1714,9 +1845,9 @@ export default function App() {
                         <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black">{log.size}</span>
                       </td>
                       <td className="p-3.5 text-center font-bold text-slate-800">{log.qty}</td>
-                      <td className="p-3.5 text-slate-500">₪{log.costPrice}</td>
-                      <td className="p-3.5 text-blue-600 font-bold">₪{log.sellPrice}</td>
-                      <td className="p-3.5 text-emerald-600 font-black">₪{log.profit}</td>
+                      <td className="p-3.5 text-slate-500">₪{formatPrice(log.costPrice)}</td>
+                      <td className="p-3.5 text-blue-600 font-bold">₪{formatPrice(log.sellPrice)}</td>
+                      <td className="p-3.5 text-emerald-600 font-black">₪{formatPrice(log.profit)}</td>
                     </tr>
                   ))}
                   {salesLogs.length === 0 && (
@@ -1922,7 +2053,7 @@ export default function App() {
               {!isPwdEmailVerified ? (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-4">
                   <div className="text-xs text-slate-500 leading-relaxed">
-                    כדי להציג את <strong className="text-slate-700">הסיסמה הישנה</strong> ולפתוח את האפשרות לעדכן לסיסמה חדשה, לחץ על הכפתור כדי לשלוח קוד אימות חד-פעמי (OTP) לכתובת המוגדרת <strong className="font-mono text-slate-700">{settings.managerEmail || 'shey7048@gmail.com'}</strong>:
+                    כדי להציג את <strong className="text-slate-700">הסיסמה הישנה</strong> ולפתוח את האפשרות לעדכן לסיסמה חדשה, לחץ על הכפתור כדי לשלוח קוד אימות חד-פעמי (OTP) לכתובת המוגדרת <strong className="font-mono text-slate-700">{settings.managerEmail || 'sp9328008@gmail.com'}</strong>:
                   </div>
 
                   {!isPwdOtpSent ? (
@@ -2117,6 +2248,7 @@ export default function App() {
                   <input
                     type="number"
                     min="0"
+                    step="any"
                     value={formCost}
                     onChange={(e) => setFormCost(Number(e.target.value))}
                     placeholder="0"
@@ -2129,6 +2261,7 @@ export default function App() {
                   <input
                     type="number"
                     min="0"
+                    step="any"
                     value={formSell}
                     onChange={(e) => setFormSell(Number(e.target.value))}
                     placeholder="0"
