@@ -41,6 +41,16 @@ function sumStock(sizes: SizesMap): number {
   return (Object.values(sizes) as number[]).reduce((sum, v) => sum + (v || 0), 0);
 }
 
+// Helper to resolve absolute API URLs for packaged Electron / desktop apps
+const getApiUrl = (endpoint: string): string => {
+  const isElectronOrLocalFile = window.location.protocol === 'file:' || window.navigator.userAgent.toLowerCase().includes('electron');
+  if (isElectronOrLocalFile) {
+    const fallbackProdUrl = 'https://ais-pre-yrb6u7pglhgu5zwfsfabqw-327994117025.europe-west2.run.app';
+    return `${fallbackProdUrl}${endpoint}`;
+  }
+  return endpoint;
+};
+
 export default function App() {
   // Authentication states
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -267,7 +277,7 @@ export default function App() {
         return;
       }
       try {
-        const res = await fetch('/api/verify-auth-code', {
+        const res = await fetch(getApiUrl('/api/verify-auth-code'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: emailToUse, code: loginCode })
@@ -292,7 +302,7 @@ export default function App() {
     const emailToUse = (settings.managerEmail || 'sp9328008@gmail.com').toLowerCase().trim();
     setOtpLoading(true);
     try {
-      const res = await fetch('/api/send-auth-code', {
+      const res = await fetch(getApiUrl('/api/send-auth-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailToUse })
@@ -362,7 +372,7 @@ export default function App() {
         const totalStock = sumStock(updatedItem.sizes);
         const alertKey = `${item.id}-${sizeName}`;
         if (newQty <= item.minStock && settings.lowStockAlertActive && !settings.alertEmailSentFor.includes(alertKey)) {
-          fetch('/api/send-alert', {
+          fetch(getApiUrl('/api/send-alert'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -459,7 +469,7 @@ export default function App() {
         const totalStock = sumStock(updatedItem.sizes);
         const alertKey = `${item.id}-${sizeName}`;
         if (newQty <= item.minStock && settings.lowStockAlertActive && !settings.alertEmailSentFor.includes(alertKey)) {
-          fetch('/api/send-alert', {
+          fetch(getApiUrl('/api/send-alert'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -779,7 +789,7 @@ export default function App() {
     }
     triggerToast('שולח דוא"ל בדיקה...', 'info');
     try {
-      const res = await fetch('/api/send-alert', {
+      const res = await fetch(getApiUrl('/api/send-alert'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -813,7 +823,7 @@ export default function App() {
     const emailToUse = (settings.managerEmail || 'sp9328008@gmail.com').toLowerCase().trim();
     setIsPwdOtpLoading(true);
     try {
-      const res = await fetch('/api/send-auth-code', {
+      const res = await fetch(getApiUrl('/api/send-auth-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailToUse })
@@ -842,7 +852,7 @@ export default function App() {
     }
     setIsPwdVerifyLoading(true);
     try {
-      const res = await fetch('/api/verify-auth-code', {
+      const res = await fetch(getApiUrl('/api/verify-auth-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailToUse, code: pwdOtpCode })
