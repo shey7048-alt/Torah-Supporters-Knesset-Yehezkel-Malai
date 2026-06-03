@@ -120,6 +120,17 @@ export default function App() {
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmNewPassword, setConfirmNewPassword] = useState<string>('');
 
+  // Local settings editing states to prevent input lag/stutters on keypress
+  const [localManagerEmail, setLocalManagerEmail] = useState<string>('');
+  const [localLowStockAlertActive, setLocalLowStockAlertActive] = useState<boolean>(true);
+
+  // Date picker states for Sales Log export
+  const [exportStartDate, setExportStartDate] = useState<string>('');
+  const [exportEndDate, setExportEndDate] = useState<string>('');
+
+  // Offline status handler
+  const [isOnline, setIsOnline] = useState<boolean>(navigator ? navigator.onLine : true);
+
   // Trigger Toast notifications helper
   const triggerToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
     setToast({ message, type });
@@ -128,16 +139,35 @@ export default function App() {
     }, 4000);
   };
 
-  // Sync Categories from Inventory
+  // Track internet connectivity
   useEffect(() => {
-    const list = new Set<string>();
-    // Inject Hebrew default categories
-    ["חולצות", "מכנסיים", "שמלות", "חליפות", "חצאיות", "מעילים וג'קטים", "אקססוריז", "אחר"].forEach(c => list.add(c));
-    inventory.forEach(item => {
-      if (item.category) list.add(item.category);
-    });
-    setCategories(Array.from(list));
-  }, [inventory]);
+    const handleOnline = () => {
+      setIsOnline(true);
+      triggerToast('חיבור האינטרנט חזר! הנתונים מסונכרנים כעת.', 'success');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      }
+    };
+  }, []);
+
+  // Sync settings database values to local manager settings state for performance
+  useEffect(() => {
+    if (settings) {
+      setLocalManagerEmail(settings.managerEmail || '');
+      setLocalLowStockAlertActive(settings.lowStockAlertActive ?? true);
+    }
+  }, [settings]);
 
   // Initialization and Fetching from Firestore (Real-time Sync)
   useEffect(() => {
@@ -170,75 +200,27 @@ export default function App() {
       handleFirestoreError(error, OperationType.LIST, 'sales');
     });
 
-    // settings live onSnapshot with safe one-time seeding trigger
+    // settings live onSnapshot with safe server-side blank database management
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data() as SystemSettings;
+        const data = docSnap.data() as SystemSettings & { categories?: string[] };
         setSettings(data);
-
-        // Seeding database only once
-        if (data.hasSeededItems === undefined || data.hasSeededItems === false) {
-          const initialSampleClothes: ClothesItem[] = [
-            {
-              id: "item-1",
-              name: "חולצת פולו קלאסית כותנה",
-              sku: "PO-CLASS-01",
-              category: "חולצות",
-              color: "כחול כהה",
-              costPrice: 40,
-              sellPrice: 99,
-              minStock: 8,
-              imageUrl: "",
-              sizes: { S: 12, M: 20, L: 15, XL: 7, XXL: 2 },
-              dateAdded: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: "item-2",
-              name: "ג'ינס סטרץ' סלים פיט",
-              sku: "JN-SLIM-04",
-              category: "מכנסיים",
-              color: "שחור",
-              costPrice: 65,
-              sellPrice: 159,
-              minStock: 6,
-              imageUrl: "",
-              sizes: { S: 4, M: 12, L: 8, XL: 4, XXL: 1 },
-              dateAdded: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: "item-3",
-              name: "גרבי כותנה אלסטיים (מארז)",
-              sku: "SOX-CTN-10",
-              category: "אקססוריז",
-              color: "לבן",
-              costPrice: 12,
-              sellPrice: 30,
-              minStock: 10,
-              imageUrl: "",
-              sizes: { "מידה אחידה": 35 },
-              dateAdded: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ];
-
-          initialSampleClothes.forEach(item => {
-            setDoc(doc(db, 'items', item.id), item).catch(err => {
-              console.error(`Error seed items:`, err);
-            });
-          });
-
-          // Mark seeded
-          setDoc(doc(db, 'settings', 'config'), { ...data, hasSeededItems: true }).catch(err => {
-            console.error(err);
-          });
+        if (data.categories) {
+          // Automatic A-Z alphabetic sorting for all categories in Hebrew locale
+          setCategories([...data.categories].sort((a, b) => a.localeCompare(b, 'he')));
+        } else {
+          setCategories([]);
         }
       } else {
-        const defaultSet: SystemSettings = {
+        // Initial setup schema for central server database config
+        const defaultSet: SystemSettings & { categories?: string[] } = {
           customLogoUrl: logoUrl,
           managerEmail: "sp9328008@gmail.com",
           lowStockAlertActive: true,
           alertEmailSentFor: [],
-          hasSeededItems: false,
-          managerPassword: '1234'
+          hasSeededItems: true, // Bypass seeding completely
+          managerPassword: '1234',
+          categories: [] // Clean empty slate managed server-side
         };
         setDoc(doc(db, 'settings', 'config'), defaultSet).catch(err => {
           handleFirestoreError(err, OperationType.CREATE, 'settings/config');
@@ -332,7 +314,9 @@ export default function App() {
   };
 
   // Quick addition and subtraction in inventory Matrix
-  const handleQuickStockChange = async (item: ClothesItem, sizeName: string, delta: number) => {
+  const handleQuickStockChange = async (itemArg: ClothesItem, sizeName: string, delta: number) => {
+    // Look up freshest state to dodge asynchronous multi-click race conditions and stales
+    const item = inventory.find(i => i.id === itemArg.id) || itemArg;
     const currentQty = item.sizes[sizeName] || 0;
     const newQty = currentQty + delta;
 
@@ -341,9 +325,15 @@ export default function App() {
       return;
     }
 
-    // Prepare updated size map
+    // Prepare updated size map and cast all numeric fields properly to keep Firestore validation rules green
     const updatedSizes = { ...item.sizes, [sizeName]: newQty };
-    const updatedItem = { ...item, sizes: updatedSizes };
+    const updatedItem: ClothesItem = {
+      ...item,
+      costPrice: Number(item.costPrice),
+      sellPrice: Number(item.sellPrice),
+      minStock: Number(item.minStock),
+      sizes: updatedSizes
+    };
 
     if (delta === -1 && minusAction === 'sale') {
       // Process registered Sale
@@ -355,9 +345,9 @@ export default function App() {
         sku: item.sku,
         size: sizeName,
         qty: 1,
-        costPrice: item.costPrice,
-        sellPrice: item.sellPrice,
-        profit: item.sellPrice - item.costPrice,
+        costPrice: Number(item.costPrice),
+        sellPrice: Number(item.sellPrice),
+        profit: Number(item.sellPrice) - Number(item.costPrice),
         timestamp: new Date().toISOString()
       };
 
@@ -432,7 +422,9 @@ export default function App() {
     return Number(val).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
 
-  const handleDirectQtyChange = async (item: ClothesItem, sizeName: string, newQty: number) => {
+  const handleDirectQtyChange = async (itemArg: ClothesItem, sizeName: string, newQty: number) => {
+    // Look up freshest state to dodge asynchronous multi-click race conditions and stales
+    const item = inventory.find(i => i.id === itemArg.id) || itemArg;
     const currentQty = item.sizes[sizeName] || 0;
     if (newQty === currentQty) return;
     if (newQty < 0) {
@@ -441,7 +433,13 @@ export default function App() {
     }
 
     const updatedSizes = { ...item.sizes, [sizeName]: newQty };
-    const updatedItem = { ...item, sizes: updatedSizes };
+    const updatedItem: ClothesItem = { 
+      ...item, 
+      costPrice: Number(item.costPrice),
+      sellPrice: Number(item.sellPrice),
+      minStock: Number(item.minStock),
+      sizes: updatedSizes 
+    };
 
     const diff = currentQty - newQty;
 
@@ -454,9 +452,9 @@ export default function App() {
         sku: item.sku,
         size: sizeName,
         qty: diff,
-        costPrice: item.costPrice,
-        sellPrice: item.sellPrice,
-        profit: diff * (item.sellPrice - item.costPrice),
+        costPrice: Number(item.costPrice),
+        sellPrice: Number(item.sellPrice),
+        profit: diff * (Number(item.sellPrice) - Number(item.costPrice)),
         timestamp: new Date().toISOString()
       };
 
@@ -773,7 +771,13 @@ export default function App() {
   const handleSettingsSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await setDoc(doc(db, 'settings', 'config'), { ...settings, hasSeededItems: settings.hasSeededItems ?? true });
+      const updatedSettings = {
+        ...settings,
+        managerEmail: localManagerEmail.trim(),
+        lowStockAlertActive: localLowStockAlertActive,
+        hasSeededItems: settings.hasSeededItems ?? true
+      };
+      await setDoc(doc(db, 'settings', 'config'), updatedSettings);
       setLogoError(false);
       triggerToast('הגדרות המיתוג והתראות המייל עודכנו!', 'success');
     } catch (err) {
@@ -905,16 +909,43 @@ export default function App() {
   };
 
   // Add category handler
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     const clean = newCategoryName.trim();
     if (!clean) return;
     if (categories.includes(clean)) {
       triggerToast('קטגוריה זו כבר קיימת במערכת', 'warning');
       return;
     }
-    setCategories([...categories, clean]);
-    setNewCategoryName('');
-    triggerToast(`הקטגוריה "${clean}" נוספה בהצלחה!`, 'success');
+    const updatedCategories = [...categories, clean].sort((a, b) => a.localeCompare(b, 'he'));
+    try {
+      await setDoc(doc(db, 'settings', 'config'), {
+        ...settings,
+        categories: updatedCategories,
+        hasSeededItems: settings.hasSeededItems ?? true
+      });
+      setNewCategoryName('');
+      triggerToast(`הקטגוריה "${clean}" נוספה בהצלחה!`, 'success');
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה בשמירת הקטגוריה בשרת', 'error');
+    }
+  };
+
+  // Delete category handler
+  const handleDeleteCategory = async (catToDelete: string) => {
+    if (catToDelete === 'אחר') return;
+    const updatedCategories = categories.filter(c => c !== catToDelete).sort((a, b) => a.localeCompare(b, 'he'));
+    try {
+      await setDoc(doc(db, 'settings', 'config'), {
+        ...settings,
+        categories: updatedCategories,
+        hasSeededItems: settings.hasSeededItems ?? true
+      });
+      triggerToast(`הקטגוריה "${catToDelete}" נמחקה בהצלחה מהשרת!`, 'success');
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה במחיקת הקטגוריה מהשרת', 'error');
+    }
   };
 
   // Reset entire metrics database backup or local profit
@@ -982,6 +1013,63 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     triggerToast('קובץ Excel (.CSV) הופק בהצלחה!', 'success');
+  };
+
+  // Sales Log Spreadsheet Export Engine with full date range filtering capabilities
+  const handleExportSalesCSV = (useDateRange: boolean) => {
+    let filteredLogs = [...salesLogs];
+
+    if (useDateRange) {
+      if (!exportStartDate && !exportEndDate) {
+        triggerToast('נא לבחור תאריכים לסינון הייצוא', 'warning');
+        return;
+      }
+      if (exportStartDate) {
+        const start = new Date(exportStartDate);
+        start.setHours(0, 0, 0, 0);
+        filteredLogs = filteredLogs.filter(log => new Date(log.timestamp) >= start);
+      }
+      if (exportEndDate) {
+        const end = new Date(exportEndDate);
+        end.setHours(23, 59, 59, 999);
+        filteredLogs = filteredLogs.filter(log => new Date(log.timestamp) <= end);
+      }
+    }
+
+    if (filteredLogs.length === 0) {
+      triggerToast('אין תנועות מכירה לייצוא תחת ההגדרות שנבחרו', 'warning');
+      return;
+    }
+
+    let csvContent = "\uFEFF"; // Hebrew UTF-8 Byte Order Mark
+    // Header Row
+    csvContent += "תאריך ושעה,דגם מוצר,מק\"ט (SKU),מידה,כמות,עלות יחידה (₪),מכירה יחידה (₪),סה\"כ עלות (₪),סה\"כ פדיון (₪),רווח נקי (₪)\n";
+
+    // Data Rows
+    filteredLogs.forEach(log => {
+      const formattedDate = new Date(log.timestamp).toLocaleString('he-IL');
+      const cleanName = log.itemName.replace(/"/g, '""');
+      const qty = log.qty || 1;
+      const totalCost = qty * log.costPrice;
+      const totalRevenue = qty * log.sellPrice;
+      const totalProfit = log.profit;
+
+      csvContent += `"${formattedDate}","${cleanName}","${log.sku}","${log.size}",${qty},${log.costPrice},${log.sellPrice},${totalCost},${totalRevenue},${totalProfit}\n`;
+    });
+
+    const filename = useDateRange 
+      ? `דוח_מכירות_תאריכים_${exportStartDate || 'התחלה'}_עד_${exportEndDate || 'סוף'}.csv` 
+      : 'דוח_מכירות_מלא.csv';
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerToast(`יומן המכירות יוצא בהצלחה! (${filteredLogs.length} שורות)`, 'success');
   };
 
   // JSON Full Database Backup & Restore operations
@@ -1280,6 +1368,29 @@ export default function App() {
   return (
     <div className="min-h-screen text-slate-900 flex flex-col bg-slate-50/50" dir="rtl">
       
+      {/* Non-dismissible network blackout blocker overlay */}
+      {!isOnline && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center select-none" dir="rtl">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-amber-500/20">
+            <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="h-10 w-10 text-rose-600 animate-bounce" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 mb-2">נותק חיבור האינטרנט</h2>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              המערכת איבדה את החיבור לרשת האינטרנט.
+              כדי למנוע שגיאות סנכרון של המלאי והמכירות, השימוש בממשק נעול באופן זמני עד לחידוש החיבור מול שרת הענן.
+            </p>
+            <div className="flex items-center justify-center gap-2 bg-slate-50 py-2.5 px-4 rounded-xl border border-slate-100">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span className="text-xs font-bold text-slate-600">מנסה להתחבר מחדש למסד הנתונים...</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Toast systems */}
       {toast && (
         <div className="fixed top-5 left-5 z-50 max-w-sm w-full transition-all duration-300">
@@ -1385,7 +1496,7 @@ export default function App() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-slate-400 text-xs font-bold mb-1">דגמים בקטלוג</p>
-                <h3 className="text-2xl font-black text-slate-900 group-hover:text-amber-500 transition-colors">{totalModelsCount} <span className="text-xs font-normal text-slate-400">דגמיםแตกต่างים</span></h3>
+                <h3 className="text-2xl font-black text-slate-900 group-hover:text-amber-500 transition-colors">{totalModelsCount} <span className="text-xs font-normal text-slate-400">דגמים ייחודיים</span></h3>
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/50 flex items-center justify-center shrink-0">
                 <Tag className="h-5 w-5 text-slate-700" />
@@ -1698,21 +1809,20 @@ export default function App() {
                                     onChange={(e) => setEditQtyValue(e.target.value)}
                                     autoFocus
                                     onBlur={() => {
-                                      const val = parseInt(editQtyValue, 10);
-                                      if (!isNaN(val) && val >= 0) {
-                                        handleDirectQtyChange(item, szName, val);
+                                      if (editQtyValue !== 'DISCARD') {
+                                        const val = parseInt(editQtyValue, 10);
+                                        if (!isNaN(val) && val >= 0) {
+                                          handleDirectQtyChange(item, szName, val);
+                                        }
                                       }
                                       setEditingSizeQty(null);
                                     }}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
-                                        const val = parseInt(editQtyValue, 10);
-                                        if (!isNaN(val) && val >= 0) {
-                                          handleDirectQtyChange(item, szName, val);
-                                        }
-                                        setEditingSizeQty(null);
+                                        e.currentTarget.blur();
                                       } else if (e.key === 'Escape') {
-                                        setEditingSizeQty(null);
+                                        setEditQtyValue('DISCARD');
+                                        e.currentTarget.blur();
                                       }
                                     }}
                                   />
@@ -1829,6 +1939,60 @@ export default function App() {
               </button>
             </div>
 
+            {/* Audited Sales Export Controller with Date Filtering */}
+            <div className="bg-slate-50/70 p-4.5 rounded-2xl border border-slate-200/50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 flex-1">
+                <div className="flex flex-col space-y-1">
+                  <span className="text-[10px] font-extrabold text-slate-400 pr-1">מתאריך:</span>
+                  <input
+                    type="date"
+                    value={exportStartDate}
+                    onChange={(e) => setExportStartDate(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 focus:outline-none h-[34px]"
+                  />
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <span className="text-[10px] font-extrabold text-slate-400 pr-1">עד תאריך:</span>
+                  <input
+                    type="date"
+                    value={exportEndDate}
+                    onChange={(e) => setExportEndDate(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 focus:outline-none h-[34px]"
+                  />
+                </div>
+                {(exportStartDate || exportEndDate) && (
+                  <button 
+                    onClick={() => {
+                      setExportStartDate('');
+                      setExportEndDate('');
+                    }}
+                    className="text-slate-400 hover:text-rose-500 text-[11px] font-bold self-end mb-1 transition-colors cursor-pointer"
+                  >
+                    נקה סינון תאריכים
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0 self-end lg:self-auto">
+                <button
+                  type="button"
+                  onClick={() => handleExportSalesCSV(false)}
+                  className="bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/10 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span>ייצוא יומן מלא</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportSalesCSV(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>ייצא לפי סינון</span>
+                </button>
+              </div>
+            </div>
+
             <div className="overflow-x-auto border border-slate-100 rounded-xl">
               <table className="w-full text-right text-xs">
                 <thead>
@@ -1895,8 +2059,8 @@ export default function App() {
                   </label>
                   <input
                     type="email"
-                    value={settings.managerEmail}
-                    onChange={(e) => setSettings({ ...settings, managerEmail: e.target.value })}
+                    value={localManagerEmail}
+                    onChange={(e) => setLocalManagerEmail(e.target.value)}
                     placeholder="למשל: manager@tt.org"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-800"
                     required
@@ -1941,8 +2105,8 @@ export default function App() {
                 <input
                   type="checkbox"
                   id="alertToggle"
-                  checked={settings.lowStockAlertActive}
-                  onChange={(e) => setSettings({ ...settings, lowStockAlertActive: e.target.checked })}
+                  checked={localLowStockAlertActive}
+                  onChange={(e) => setLocalLowStockAlertActive(e.target.checked)}
                   className="h-4.5 w-4.5 rounded text-amber-600 focus:ring-amber-500/30 border-slate-300 mt-0.5 cursor-pointer"
                 />
                 <div>
@@ -2364,10 +2528,7 @@ export default function App() {
                       <span className="text-xs font-bold text-slate-700">{c}</span>
                       {c !== 'אחר' && (
                         <button
-                          onClick={() => {
-                            setCategories(categories.filter(cat => cat !== c));
-                            triggerToast('קטגוריה נמחקה מקומית', 'info');
-                          }}
+                          onClick={() => handleDeleteCategory(c)}
                           className="text-slate-400 hover:text-red-500 cursor-pointer"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
