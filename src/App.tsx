@@ -33,7 +33,7 @@ import { ClothesItem, SaleLog, SystemSettings, SizesMap } from './types';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 
-const logoUrl = "https://raw.githubusercontent.com/shey7048-alt/Torah-Supporters-Logo/refs/heads/main/%D7%9C%D7%95%D7%92%D7%95%20%D7%AA%D7%AA%20%D7%94%D7%93%D7%A9image%20(13).png";
+const logoUrl = "https://raw.githubusercontent.com/shey7048-alt/Torah-Supporters-Logo/refs/heads/main/%D7%9C%D7%95%D7%92%D7%95%20%D7%AA%D7%AA%20%D7%97%D7%93%D7%A9image%20(13).png";
 
 // Helper to sum stock sizes cleanly and prevent aggregate type warnings
 function sumStock(sizes: SizesMap): number {
@@ -387,7 +387,7 @@ export default function App() {
             if (res.ok) {
               // Mark email as sent to prevent duplicates ONLY if it sent successfully!
               const updatedAlertKeys = [...settings.alertEmailSentFor, alertKey];
-              await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+              await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys, hasSeededItems: settings.hasSeededItems ?? true });
               triggerToast(`נשלחה התראת חוסר במלאי למייל המנהל!`, 'info');
               console.log("Low stock alert email sent successfully.");
             } else {
@@ -419,7 +419,7 @@ export default function App() {
         const alertKey = `${item.id}-${sizeName}`;
         if (newQty > item.minStock && settings.alertEmailSentFor.includes(alertKey)) {
           const updatedAlertKeys = settings.alertEmailSentFor.filter(k => k !== alertKey);
-          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys, hasSeededItems: settings.hasSeededItems ?? true });
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `items/${item.id}`);
@@ -483,7 +483,7 @@ export default function App() {
           .then(async (res) => {
             if (res.ok) {
               const updatedAlertKeys = [...settings.alertEmailSentFor, alertKey];
-              await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+              await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys, hasSeededItems: settings.hasSeededItems ?? true });
               triggerToast(`נשלחה התראת חוסר במלאי למייל המנהל!`, 'info');
               console.log("Low stock alert email sent successfully.");
             } else {
@@ -507,7 +507,7 @@ export default function App() {
         const alertKey = `${item.id}-${sizeName}`;
         if (newQty > item.minStock && settings.alertEmailSentFor.includes(alertKey)) {
           const updatedAlertKeys = settings.alertEmailSentFor.filter(k => k !== alertKey);
-          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys, hasSeededItems: settings.hasSeededItems ?? true });
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `items/${item.id}`);
@@ -724,7 +724,7 @@ export default function App() {
           }
         });
         if (updatedAlertKeys.length !== settings.alertEmailSentFor.length) {
-          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys });
+          await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: updatedAlertKeys, hasSeededItems: settings.hasSeededItems ?? true });
         }
 
         triggerToast('הדגם עודכן ברחבי מסד הנתונים בהצלחה!', 'success');
@@ -773,7 +773,7 @@ export default function App() {
   const handleSettingsSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await setDoc(doc(db, 'settings', 'config'), settings);
+      await setDoc(doc(db, 'settings', 'config'), { ...settings, hasSeededItems: settings.hasSeededItems ?? true });
       setLogoError(false);
       triggerToast('הגדרות המיתוג והתראות המייל עודכנו!', 'success');
     } catch (err) {
@@ -888,7 +888,7 @@ export default function App() {
     }
 
     try {
-      const updatedSettings = { ...settings, managerPassword: newPassword };
+      const updatedSettings = { ...settings, managerPassword: newPassword, hasSeededItems: settings.hasSeededItems ?? true };
       await setDoc(doc(db, 'settings', 'config'), updatedSettings);
       setSettings(updatedSettings);
       triggerToast('סיסמת המנהל עודכנה בהצלחה בתוך Firebase!', 'success');
@@ -921,7 +921,7 @@ export default function App() {
   const handleResetProfit = async () => {
     if (confirm('האם לאפס את חישוב הרווח המצטבר ממכירות ל-0 ₪? שינוי זה ינקה גם את יומן התנועות.')) {
       try {
-        await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: [] });
+        await setDoc(doc(db, 'settings', 'config'), { ...settings, alertEmailSentFor: [], hasSeededItems: settings.hasSeededItems ?? true });
         // Clean out sales documents
         for (const log of salesLogs) {
           await deleteDoc(doc(db, 'sales', log.id));
@@ -1029,7 +1029,7 @@ export default function App() {
           }
 
           if (importedSettings) {
-            await setDoc(doc(db, 'settings', 'config'), importedSettings);
+            await setDoc(doc(db, 'settings', 'config'), { ...importedSettings, hasSeededItems: true });
           }
 
           triggerToast('שחזור מגיבוי הושלם בהצלחה!', 'success');
@@ -1095,7 +1095,7 @@ export default function App() {
   const totalAccumulatedProfit = salesLogs.reduce((sum, log) => sum + log.profit, 0);
 
   // Logo fallback handler
-  const activeLogoUrl = (settings.customLogoUrl && !settings.customLogoUrl.includes('logo.svg') && settings.customLogoUrl.trim() !== '') ? settings.customLogoUrl : logoUrl;
+  const activeLogoUrl = logoUrl;
 
   // Reset errors on logo configuration change
   useEffect(() => {
@@ -1906,85 +1906,25 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Custom Branding logo configuration */}
+                {/* Custom Branding logo configuration - PERMANENT SHOWCASE */}
                 <div className="space-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100 col-span-1 md:col-span-2">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                      <ImageIcon className="h-4 w-4 text-amber-600" />
-                      <span>סמל הלוגו של הת"ת</span>
-                    </label>
-                    <p className="text-[10px] text-slate-400">באפשרותך להעלות תמונה מהמחשב או להזין קישור אינטרנט ישיר.</p>
-                  </div>
-
-                  {/* Logo Image Preview Block */}
-                  {settings.customLogoUrl && (
-                    <div className="flex items-center gap-3 p-3 bg-white border border-slate-150 rounded-xl">
-                      {!customLogoPreviewError ? (
-                        <img 
-                          src={settings.customLogoUrl} 
-                          alt="Logo Preview" 
-                          referrerPolicy="no-referrer"
-                          className="h-10 object-contain bg-slate-50 p-1 rounded border border-slate-100 max-w-[120px]" 
-                          onError={() => {
-                            setCustomLogoPreviewError(true);
-                          }}
-                        />
-                      ) : (
-                        <div className="h-10 px-2.5 bg-amber-50 text-amber-700 font-extrabold text-[10px] rounded border border-amber-200 flex items-center justify-center">
-                          שגיאת טעינה
-                        </div>
-                      )}
-                      
-                      <div className="flex-1 min-w-0">
-                        <span className="block text-[10px] font-bold text-slate-400 uppercase">תצוגה מקדימה של הלוגו</span>
-                        <span className="block text-xs font-semibold text-slate-600 truncate">
-                          {settings.customLogoUrl.startsWith('data:') ? 'קובץ תמונה שהועלה (Base64)' : settings.customLogoUrl}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSettings({ ...settings, customLogoUrl: '' });
-                          triggerToast('הלוגו אופס לברירת מחדל!', 'info');
-                        }}
-                        className="text-xs text-rose-500 hover:text-rose-700 font-bold p-1 cursor-pointer hover:bg-rose-50 rounded"
-                        title="אפס לוגו לברירת מחדל"
-                      >
-                        איפוס לוגו
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                    {/* Option A: Direct File Upload */}
-                    <div className="relative">
-                      <label className="block text-[11px] font-bold text-slate-500 mb-1">העלה קובץ תמונה (PNG/JPG)</label>
-                      <div className="flex items-center justify-center w-full">
-                        <label className="flex flex-col items-center justify-center w-full h-12 border border-slate-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 hover:border-amber-400 transition-all">
-                          <div className="flex items-center gap-2">
-                            <Upload className="w-4 h-4 text-slate-400" />
-                            <span className="text-xs font-bold text-slate-500">לחץ לבחירת קובץ</span>
-                          </div>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={handleLogoUpload} 
-                            className="hidden" 
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Option B: Web URL Input */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-500 mb-1">או הדבק קישור לוגו חיצוני (URL)</label>
-                      <input
-                        type="url"
-                        value={settings.customLogoUrl}
-                        onChange={(e) => setSettings({ ...settings, customLogoUrl: e.target.value })}
-                        placeholder="למשל: https://site.com/logo.png"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-left text-slate-800"
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-white p-2 rounded-xl border border-slate-200 flex items-center justify-center">
+                      <img 
+                        src={logoUrl} 
+                        alt="לוגו תת כנסת יחזקאל" 
+                        referrerPolicy="no-referrer"
+                        className="h-12 object-contain" 
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                        <ImageIcon className="h-4 w-4 text-amber-600" />
+                        <span>סמל הלוגו של הת"ת - קבוע</span>
+                      </label>
+                      <p className="text-xs text-slate-500 leading-normal mt-0.5">
+                        לוגו ת"ת כנסת יחזקאל מוגדר כעת כקבוע במערכת ללא אפשרות שינוי, בהתאם לדרישתכם.
+                      </p>
                     </div>
                   </div>
                 </div>
