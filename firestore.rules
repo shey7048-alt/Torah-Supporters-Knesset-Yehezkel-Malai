@@ -66,7 +66,8 @@ service cloud.firestore {
         && (!('smtpHost' in data) || data.smtpHost is string)
         && (!('smtpPort' in data) || data.smtpPort is number)
         && (!('smtpUser' in data) || data.smtpUser is string)
-        && (!('smtpPass' in data) || data.smtpPass is string);
+        && (!('smtpPass' in data) || data.smtpPass is string)
+        && (!('apiServerUrl' in data) || data.apiServerUrl is string);
     }
 
     // ---------- COLLECTION RULE SETS ----------

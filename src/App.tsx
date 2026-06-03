@@ -45,6 +45,13 @@ function sumStock(sizes: SizesMap): number {
 // Helper to resolve absolute API URLs for packaged Electron / desktop apps
 const getApiUrl = (endpoint: string): string => {
   const isElectronOrLocalFile = window.location.protocol === 'file:' || window.navigator.userAgent.toLowerCase().includes('electron');
+  const storedUrl = localStorage.getItem('apiServerUrl');
+  if (storedUrl) {
+    const trimmed = storedUrl.trim().replace(/\/$/, '');
+    if (trimmed) {
+      return `${trimmed}${endpoint}`;
+    }
+  }
   if (isElectronOrLocalFile) {
     const fallbackProdUrl = 'https://ais-pre-yrb6u7pglhgu5zwfsfabqw-327994117025.europe-west2.run.app';
     return `${fallbackProdUrl}${endpoint}`;
@@ -128,6 +135,7 @@ export default function App() {
   const [localSmtpPort, setLocalSmtpPort] = useState<number>(587);
   const [localSmtpUser, setLocalSmtpUser] = useState<string>('');
   const [localSmtpPass, setLocalSmtpPass] = useState<string>('');
+  const [localApiServerUrl, setLocalApiServerUrl] = useState<string>('');
 
   // Date picker states for Sales Log export
   const [exportStartDate, setExportStartDate] = useState<string>('');
@@ -175,6 +183,7 @@ export default function App() {
       setLocalSmtpPort(settings.smtpPort ?? 587);
       setLocalSmtpUser(settings.smtpUser || '');
       setLocalSmtpPass(settings.smtpPass || '');
+      setLocalApiServerUrl(settings.apiServerUrl || '');
     }
   }, [settings]);
 
@@ -214,6 +223,11 @@ export default function App() {
       if (docSnap.exists()) {
         const data = docSnap.data() as SystemSettings & { categories?: string[] };
         setSettings(data);
+        if (data.apiServerUrl) {
+          localStorage.setItem('apiServerUrl', data.apiServerUrl.trim());
+        } else {
+          localStorage.removeItem('apiServerUrl');
+        }
         if (data.categories) {
           // Automatic A-Z alphabetic sorting for all categories in Hebrew locale
           setCategories([...data.categories].sort((a, b) => a.localeCompare(b, 'he')));
@@ -808,6 +822,7 @@ export default function App() {
         smtpPort: Number(localSmtpPort),
         smtpUser: localSmtpUser.trim(),
         smtpPass: localSmtpPass.trim(),
+        apiServerUrl: localApiServerUrl.trim(),
         hasSeededItems: settings.hasSeededItems ?? true
       };
       await setDoc(doc(db, 'settings', 'config'), updatedSettings);
@@ -2218,6 +2233,24 @@ export default function App() {
                       placeholder="הזן סיסמת אפליקציה של 16 תווים"
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
                     />
+                  </div>
+
+                  <div className="col-span-1 md:col-span-2 border-t border-slate-150 pt-3">
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                      <span>🔗 כתובת שרת ה-API המארח (Wired Server API URL)</span>
+                      <span className="text-[10px] font-normal text-slate-400">(נדרש עבור שליחה מהתוכנה השולחנית)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={localApiServerUrl}
+                      onChange={(e) => setLocalApiServerUrl(e.target.value)}
+                      placeholder="למשל: https://ais-dev-yrb6u7pglhgu5zwfsfabqw-327994117025.europe-west2.run.app"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono text-left"
+                      dir="ltr"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                      כאשר משתמשים בתוכנה המותקנת במחשב, היא פונה לשרת המרוחק בכתובת זו כדי לשלוח קודי אימות, התראות מלאי ודואר. יש להעתיק לכאן את כתובת ה-URL של הדפדפן הפעיל (באתר).
+                    </p>
                   </div>
                 </div>
 

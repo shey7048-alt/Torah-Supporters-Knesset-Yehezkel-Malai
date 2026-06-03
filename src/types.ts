@@ -45,6 +45,7 @@ export interface SystemSettings {
   smtpPort?: number;
   smtpUser?: string;
   smtpPass?: string;
+  apiServerUrl?: string;
 }
 
 export interface DashboardStats {
