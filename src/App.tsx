@@ -28,7 +28,11 @@ import {
   MinusCircle,
   TrendingUp,
   RotateCcw,
-  Server
+  Server,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Globe
 } from 'lucide-react';
 import { ClothesItem, SaleLog, SystemSettings, SizesMap } from './types';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -137,6 +141,11 @@ export default function App() {
   const [localSmtpPass, setLocalSmtpPass] = useState<string>('');
   const [localApiServerUrl, setLocalApiServerUrl] = useState<string>('');
 
+  // Password / credential visibility toggling states
+  const [showSmtpPass, setShowSmtpPass] = useState<boolean>(false);
+  const [showManagerOldPass, setShowManagerOldPass] = useState<boolean>(false);
+  const [showNewPass, setShowNewPass] = useState<boolean>(false);
+
   // Date picker states for Sales Log export
   const [exportStartDate, setExportStartDate] = useState<string>('');
   const [exportEndDate, setExportEndDate] = useState<string>('');
@@ -222,7 +231,22 @@ export default function App() {
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data() as SystemSettings & { categories?: string[] };
-        setSettings(data);
+        
+        // Auto-migrate or clean up managerEmail to always point correct destination 'sp9328008@gmail.com' (lowercased)
+        const currentEmail = (data.managerEmail || '').toLowerCase().trim();
+        if (currentEmail !== 'sp9328008@gmail.com') {
+          const updated = {
+            ...data,
+            managerEmail: 'sp9328008@gmail.com'
+          };
+          setDoc(doc(db, 'settings', 'config'), updated).catch((err) => {
+            console.error("Auto-syncing manager email failed:", err);
+          });
+          setSettings(updated);
+        } else {
+          setSettings(data);
+        }
+
         if (data.apiServerUrl) {
           localStorage.setItem('apiServerUrl', data.apiServerUrl.trim());
         } else {
@@ -835,7 +859,8 @@ export default function App() {
   };
 
   const handleSendTestEmail = async () => {
-    if (!settings.managerEmail) {
+    const targetEmail = (localManagerEmail.trim() || settings.managerEmail || 'sp9328008@gmail.com').toLowerCase().trim();
+    if (!targetEmail) {
       triggerToast('נא להגדיר כתובת אימייל תחילה', 'warning');
       return;
     }
@@ -855,17 +880,17 @@ export default function App() {
           sizeName: "M", 
           currentQty: 3, 
           totalStock: 3,
-          managerEmail: settings.managerEmail,
-          customSmtp: settings.smtpHost ? {
-            host: settings.smtpHost,
-            port: settings.smtpPort,
-            user: settings.smtpUser,
-            pass: settings.smtpPass
+          managerEmail: targetEmail,
+          customSmtp: localSmtpHost ? {
+            host: localSmtpHost,
+            port: localSmtpPort,
+            user: localSmtpUser,
+            pass: localSmtpPass
           } : undefined
         })
       });
       if (res.ok) {
-        triggerToast('מייל בדיקה נשלח בהצלחה לכתובת המייל!', 'success');
+        triggerToast('מייל בדיקה נשלח בהצלחה לכתובת המייל המוגדרת!', 'success');
       } else {
         const errData = await res.json().catch(() => ({}));
         triggerToast(errData.error || 'שגיאה בשליחת מייל הבדיקה', 'error');
@@ -2028,7 +2053,7 @@ export default function App() {
                       setExportStartDate('');
                       setExportEndDate('');
                     }}
-                    className="text-slate-400 hover:text-rose-500 text-[11px] font-bold self-end mb-1 transition-colors cursor-pointer"
+                    className="text-slate-400 hover:text-rose-550 text-[11px] font-bold self-end mb-1 transition-colors cursor-pointer"
                   >
                     נקה סינון תאריכים
                   </button>
@@ -2066,7 +2091,7 @@ export default function App() {
                     <th className="p-3.5 text-center">כמות</th>
                     <th className="p-3.5">עלות פריט</th>
                     <th className="p-3.5">מחיר מכירה</th>
-                    <th className="p-3.5 text-emerald-600">רווח נקי</th>
+                    <th className="p-3.5 text-emerald-600 font-bold">רווח נקי</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -2101,216 +2126,237 @@ export default function App() {
 
         {/* TAB 3: SETTINGS AND EMAIL ALERTS PARAMETERS */}
         {activeTab === 'settings' && (
-          <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto space-y-6">
-            <div>
-              <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
-                <Settings className="h-5 w-5 text-amber-600" />
-                <span>הגדרות קונפיגורציה, מיתוג והתראות מייל</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">נהל את יעדי הדוח, כמות האזהרות המינימליות, נתוני המייל של מנהל הת"ת וכתובות הלוגו.</p>
+          <section className="bg-slate-55/60 p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm max-w-4xl mx-auto space-y-6 text-right" dir="rtl">
+            {/* Header Title with premium badge */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+              <div>
+                <span className="bg-amber-100/85 text-amber-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider mb-2 inline-block">
+                  מערך הגדרות מערכת והתראות מלאי
+                </span>
+                <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                  <Settings className="h-5.5 w-5.5 text-amber-600" />
+                  <span>הגדרות קונפיגורציה, מיתוג והתראות דוא"ל</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  ניהול יעדי הדיווח של המחסן, שערי שרת דואר יוצא (SMTP) לתוכנה שולחנית, אבטחת סיסמאות וסנכרון רשת.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-sm shrink-0">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10.5px] font-bold text-slate-600">סנכרון ענן פעיל</span>
+              </div>
             </div>
 
             <form onSubmit={handleSettingsSave} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Manager notification email targets */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <Mail className="h-4 w-4 text-amber-600" />
-                    <span>אימייל לקבלת התראות מלאי של הת"ת</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={localManagerEmail}
-                    onChange={(e) => setLocalManagerEmail(e.target.value)}
-                    placeholder="למשל: manager@tt.org"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-semibold text-slate-800"
-                    required
-                  />
-                  <span className="text-[10px] text-slate-400 mt-1 block leading-normal">
-                    המערכת תשלח אימייל Hebrew מעוצב ומפורט עם SKU ישיר בכל פעם שהמלאי של מידה כלשהי יירד מתחת לסף ההתרעה שלך.
-                  </span>
+              
+              {/* SECTION 1: הנהלה ומיתוג מותאם */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-[0_1px_5px_rgba(0,0,0,0.01)] space-y-5">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <Mail className="h-4.5 w-4.5 text-amber-600" />
+                  <h4 className="text-xs font-black text-slate-800">1. הגדרות דיווח מנהל ומיתוג</h4>
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700">אימייל מנהל הת"ת לקבלת התראות מלאי</label>
+                    <input
+                      type="email"
+                      value={localManagerEmail || 'sp9328008@gmail.com'}
+                      onChange={(e) => setLocalManagerEmail(e.target.value)}
+                      placeholder="sp9328008@gmail.com"
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-bold font-mono text-left text-slate-800"
+                      dir="ltr"
+                      disabled
+                      required
+                    />
+                    <span className="text-[10px] text-slate-400 block leading-relaxed">
+                      כתובת מנהל המערכת קבועה ומסונכרנת ל- <strong>sp9328008@gmail.com</strong> עבור כל דוחות התראות חוסר המלאי.
+                    </span>
+                  </div>
 
-                {/* Custom Branding logo configuration - PERMANENT SHOWCASE */}
-                <div className="space-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100 col-span-1 md:col-span-2">
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-white p-2 rounded-xl border border-slate-200 flex items-center justify-center">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 flex items-center gap-4">
+                    <div className="h-12 w-12 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
                       <img 
                         src={logoUrl} 
                         alt="לוגו תת כנסת יחזקאל" 
                         referrerPolicy="no-referrer"
-                        className="h-12 object-contain" 
+                        className="h-10 object-contain" 
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                        <ImageIcon className="h-4 w-4 text-amber-600" />
-                        <span>סמל הלוגו של הת"ת - קבוע</span>
-                      </label>
-                      <p className="text-xs text-slate-500 leading-normal mt-0.5">
-                        לוגו ת"ת כנסת יחזקאל מוגדר כעת כקבוע במערכת ללא אפשרות שינוי, בהתאם לדרישתכם.
+                      <span className="block text-xs font-bold text-slate-755">לוגו הזהות מוגדר כקבוע</span>
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                        מותג ת"ת כנסת יחזקאל מעוגן קבוע בתוכנה, בדלפקים ובמיילים עם הגנת מחיקה.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Placeholder empty div to preserve clean layout since password is now in a distinct safe block below */}
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-center text-center opacity-60">
-                  <span className="text-xs text-slate-400">הגדרות אבטחה מתקדמות וסודיות מנוהלות בצורה בטוחה בתיבה נפרדת מטה.</span>
+                <div className="bg-slate-50/75 p-4 rounded-xl border border-slate-200 flex items-start gap-3 mt-2">
+                  <input
+                    type="checkbox"
+                    id="alertToggle"
+                    checked={localLowStockAlertActive}
+                    onChange={(e) => setLocalLowStockAlertActive(e.target.checked)}
+                    className="h-4.5 w-4.5 rounded text-amber-600 focus:ring-amber-500/30 border-slate-300 mt-0.5 cursor-pointer accent-amber-600 shadow-sm"
+                  />
+                  <div>
+                    <label htmlFor="alertToggle" className="block text-xs font-bold text-slate-700 cursor-pointer">
+                      אפשר התראות אימייל אקטיביות (מומלץ לחדר המכירות)
+                    </label>
+                    <span className="text-[10.5px] block text-slate-400 mt-0.5 leading-relaxed">
+                      בעת רישום מכירה בקופסא, המערכת תבדוק אוטומטית אם מידה חצתה את סף המינימום ותריץ שליחת דוא"ל מפורט עם מק"ט ישיר.
+                    </span>
+                  </div>
                 </div>
-
               </div>
 
-              {/* Email alerts checkbox */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="alertToggle"
-                  checked={localLowStockAlertActive}
-                  onChange={(e) => setLocalLowStockAlertActive(e.target.checked)}
-                  className="h-4.5 w-4.5 rounded text-amber-600 focus:ring-amber-500/30 border-slate-300 mt-0.5 cursor-pointer"
-                />
-                <div>
-                  <label htmlFor="alertToggle" className="block text-sm font-bold text-slate-700 cursor-pointer">
-                    אפשר התראות אימייל אקטיביות
-                  </label>
-                  <span className="text-xs block text-slate-400">
-                    כאשר תיבה זו מסומנת, המערכת תיגש לשרת שליחת המיילים בעת רכישות.
+              {/* SECTION 2: הגדרות שרת דואר יוצא SMTP ומתאם API */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-[0_1px_5px_rgba(0,0,0,0.01)] space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-4.5 w-4.5 text-amber-600" />
+                    <h4 className="text-xs font-black text-slate-800">2. הגדרות שרת דואר יוצא (SMTP) לתוכנה המקומית והאתר</h4>
+                  </div>
+                  <span className="bg-slate-100 text-slate-600 text-[9px] px-2 py-0.5 rounded-md font-extrabold font-mono uppercase tracking-wider">
+                    שרת API לתוכנה שולחנית
                   </span>
                 </div>
-              </div>
-
-              {/* SMTP configuration options form fields */}
-              <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                    <Server className="h-4 w-4 text-amber-600" />
-                    <span>הגדרות שרת דואר יוצא (SMTP) בתוכנה</span>
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                    כדי שלא תצטרכו להגדיר משתני סביבה בקוד או בפריסה, באפשרותכם להזין כאן פעם אחת בלבד את הגדרות ה-SMTP של תיבת המייל והיא תישמר באופן בטוח בתוך מסד הנתונים שלכם.
-                  </p>
-                </div>
+                
+                <p className="text-[11px] text-slate-500 leading-normal">
+                  ניתן להזין פעם אחת בלבד את שרת ה-SMTP של תיבת המייל שלכם כדי שגרסת האתר וכן התוכנה המותקנת במחשב יבצעו שליחה תקינה ללא תלות במתכנת או בשינויי קוד.
+                </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">שרת (SMTP Host)</label>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-600">שרת שליחה (SMTP Host)</label>
                     <input
                       type="text"
                       value={localSmtpHost}
                       onChange={(e) => setLocalSmtpHost(e.target.value)}
-                      placeholder="למשל: smtp.gmail.com"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
+                      placeholder="smtp.gmail.com"
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-bold font-mono text-left text-slate-800"
+                      dir="ltr"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">פורט (SMTP Port)</label>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-600">פורט שליחה (SMTP Port)</label>
                     <input
                       type="number"
                       value={localSmtpPort || ''}
                       onChange={(e) => setLocalSmtpPort(e.target.value === '' ? 587 : Number(e.target.value))}
-                      placeholder="למשל: 587 או 465"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
+                      placeholder="587 או 465"
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-bold font-mono text-left text-slate-800"
+                      dir="ltr"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">אימייל השולח / משתמש (SMTP User)</label>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-600">שם משתמש / אימייל לשליחה (SMTP User)</label>
                     <input
                       type="text"
                       value={localSmtpUser}
                       onChange={(e) => setLocalSmtpUser(e.target.value)}
-                      placeholder="למשל: tt.email.sender@gmail.com"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
+                      placeholder="tt.email.sender@gmail.com"
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-bold font-mono text-left text-slate-800"
+                      dir="ltr"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">סיסמה או סיסמת אפליקציה (SMTP Password)</label>
-                    <input
-                      type="password"
-                      value={localSmtpPass}
-                      onChange={(e) => setLocalSmtpPass(e.target.value)}
-                      placeholder="הזן סיסמת אפליקציה של 16 תווים"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
-                    />
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-600">סיסמת אפליקציה SMTP (מוצפנת ומאובטחת)</label>
+                    <div className="relative">
+                      <input
+                        type={showSmtpPass ? "text" : "password"}
+                        value={localSmtpPass}
+                        onChange={(e) => setLocalSmtpPass(e.target.value)}
+                        placeholder="סיסמה חסויה"
+                        className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-bold font-mono text-left text-slate-800"
+                        dir="ltr"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpPass(!showSmtpPass)}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
+                        title={showSmtpPass ? "הסתר סיסמה" : "הצג סיסמה"}
+                      >
+                        {showSmtpPass ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="col-span-1 md:col-span-2 border-t border-slate-150 pt-3">
-                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                      <span>🔗 כתובת שרת ה-API המארח (Wired Server API URL)</span>
-                      <span className="text-[10px] font-normal text-slate-400">(נדרש עבור שליחה מהתוכנה השולחנית)</span>
+                  <div className="col-span-1 md:col-span-2 border-t border-slate-100 pt-3.5 mt-1.5 space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Globe className="h-4 w-4 text-amber-600" />
+                      <span>🔗 כתובת שרת ה-API המארח לתוכנה שולחנית (Wired Server API URL)</span>
                     </label>
                     <input
                       type="text"
                       value={localApiServerUrl}
                       onChange={(e) => setLocalApiServerUrl(e.target.value)}
-                      placeholder="למשל: https://ais-dev-yrb6u7pglhgu5zwfsfabqw-327994117025.europe-west2.run.app"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono text-left"
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-bold font-mono text-left text-slate-800"
                       dir="ltr"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                      כאשר משתמשים בתוכנה המותקנת במחשב, היא פונה לשרת המרוחק בכתובת זו כדי לשלוח קודי אימות, התראות מלאי ודואר. יש להעתיק לכאן את כתובת ה-URL של הדפדפן הפעיל (באתר).
+                    <p className="text-[10px] text-slate-400 leading-relaxed pt-0.5">
+                      <strong>לשימוש בתוכנה במחשב:</strong> התוכנה במחשב פונה לכתובת זו כדי לגשת לשרת המיילים המרכזי. יש להעתיק לכאן בצורה מדויקת את ה-URL של האתר שבראש דפדפנך כעת.
                     </p>
                   </div>
                 </div>
 
-                <div className="text-[10px] text-slate-500 bg-amber-50/50 p-3 rounded-lg border border-amber-200/40 flex items-start gap-1.5 leading-relaxed">
-                  <span className="text-amber-700 font-bold">💡 טיפ חשוב ל-Gmail:</span>
-                  <span>
-                    כדי שגוגל יאפשר שליחה מהתיבה שלכם, הפעילו בחשבון Google הראשי שלכם <strong>"אימות דו-שלבי"</strong>, ואז צרו <strong>"סיסמת אפליקציה" (App Password)</strong> באגף האבטחה. המערכת תפיק לכם קוד ייעודי בן 16 אותיות באנגלית - העתיקו אותו והדביקו אותו כאן!
-                  </span>
+                {/* Info and Integrated Test Email Dispatch button */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3.5 border-t border-slate-100">
+                  <div className="text-[10.5px] text-slate-500 bg-amber-50/50 p-3 rounded-xl border border-amber-205 flex items-start gap-2 leading-relaxed">
+                    <span className="text-amber-700 font-extrabold text-xs">💡 טיפ לשרות Gmail:</span>
+                    <span>
+                      הפעילו בחשבון ה-Google שלכם "אימות דו-שלבי", צרו "סיסמת אפליקציה" (App Password) באביזרי האבטחה, והעתיקו את קוד ה-16 תווים לכאן.
+                    </span>
+                  </div>
+
+                  {/* Testing Suite Action Container */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3 shadow-none">
+                    <div className="text-right">
+                      <span className="block text-xs font-black text-slate-700">בדיקת תפקוד שרת מיילים</span>
+                      <span className="text-[9.5px] block text-slate-400 leading-tight">שלח דוא"ל נסיוני מעוצב ישירות לכתובת המנהל.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSendTestEmail}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <Mail className="h-3 w-3" />
+                      <span>שלח מייל בדיקה</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Verification dispatch tester */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <span className="block text-sm font-bold text-slate-700">בדיקת תקינות התראות וסנכרון מיילים</span>
-                  <span className="text-xs block text-slate-400">שלח דוא"ל נסיוני מעוצב לכתובת המוגדרת לעיל כדי לוודא קבלה.</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSendTestEmail}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2 px-4 rounded-xl shadow transition-all cursor-pointer inline-flex items-center gap-1.5 shrink-0 self-stretch sm:self-auto justify-center"
-                >
-                  <Mail className="h-3.5 w-3.5" />
-                  <span>שלח מייל בדיקה</span>
-                </button>
-              </div>
-
-              {/* Info text */}
-              <div className="bg-amber-50/40 p-4 rounded-xl border border-amber-200/50 text-amber-800 text-xs leading-relaxed">
-                <p className="font-bold flex items-center gap-1.5 mb-1 text-amber-900">
-                  <CheckCircle2 className="h-4 w-4 text-amber-600" />
-                  <span>אינטגרציה חסינה מפני נפילות!</span>
-                </p>
-                אם פרטי שרת המייל (EMAIL_USER & EMAIL_PASS) שלכם טרם הוכנסו בלוח הסודות (Secrets Panel) באיי Studio, המערכת תבצע פלט (Output Log) דמה מלא של המיילים לטרמינל הפנימי של השרת במקום לקרוס. מלאו את הכתובת שלכם ותוכלו לחבר את פרטי ה-SMTP בהמשך בשיא הבטיחות!
-              </div>
-
-              <div className="flex justify-end pt-2 border-t border-slate-100">
+              {/* Form Action Submit Section */}
+              <div className="flex justify-start pt-2">
                 <button
                   type="submit"
-                  className="bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-extrabold py-2.5 px-6 rounded-xl shadow transition-all cursor-pointer border border-amber-500/10 text-xs"
+                  className="bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-black py-2.5 px-6 rounded-xl shadow-md transition-all cursor-pointer border border-amber-500/10 text-xs flex items-center gap-1.5"
                 >
-                  שמור הגדרות מנהל
+                  <CheckCircle2 className="h-4 w-4 text-amber-400" />
+                  <span>שמור הגדרות מנהל</span>
                 </button>
               </div>
             </form>
 
             {/* SECURE PASSWORD CHANGING SYSTEM - REQUIRES OTP CONFIRMATION */}
-            <div className="border-t border-slate-100 pt-6 mt-6 space-y-4">
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-[0_1px_5px_rgba(0,0,0,0.01)] space-y-4 pt-5 mt-6">
               <div>
-                <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                  <SlidersHorizontal className="h-4.5 w-4.5 text-amber-600" />
-                  <span>שינוי סיסמת מנהל בטוח (מאומת מייל)</span>
+                <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                  <ShieldCheck className="h-4.5 w-4.5 text-amber-600" />
+                  <span>3. שינוי סיסמת מנהל מאובטח בתוכנה (מאומת מייל אקטיבי)</span>
                 </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">למען אבטחה מרבית, שינוי סיסמת הכניסה למנהל מחייב אימות אימייל אקטיבי של מנהל הת"ת.</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  למען אבטחה מרבית, שינוי סיסמת הגישה המשמשת את דלפק חדר המלאי מחייב אימות אימייל אקטיבי בתיבת הדואר של מנהל הת"ת.
+                </p>
               </div>
 
               {!isPwdEmailVerified ? (
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-4">
-                  <div className="text-xs text-slate-500 leading-relaxed">
-                    כדי להציג את <strong className="text-slate-700">הסיסמה הישנה</strong> ולפתוח את האפשרות לעדכן לסיסמה חדשה, לחץ על הכפתור כדי לשלוח קוד אימות חד-פעמי (OTP) לכתובת המוגדרת <strong className="font-mono text-slate-700">{settings.managerEmail || 'sp9328008@gmail.com'}</strong>:
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="text-xs text-slate-550 leading-relaxed max-w-xl">
+                    כדי להציג לתצוגה את <strong>הסיסמה הישנה</strong> ולפתוח את האפשרות לעדכן למפתח כניסה חדש, שלח קוד אימות זמני (OTP) אל המייל המוגדר <strong className="font-mono text-slate-700 font-black">sp9328008@gmail.com</strong>:
                   </div>
 
                   {!isPwdOtpSent ? (
@@ -2318,82 +2364,104 @@ export default function App() {
                       type="button"
                       onClick={handleSendPwdOtp}
                       disabled={isPwdOtpLoading}
-                      className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs py-2 px-4 rounded-xl shadow transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                      className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs py-2 px-4.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shrink-0"
                     >
-                      {isPwdOtpLoading ? 'שולח קוד אימות...' : 'שלח קוד אימות למייל'}
+                      {isPwdOtpLoading ? 'שולח קוד...' : 'שלח קוד אימות'}
                     </button>
                   ) : (
-                    <form onSubmit={handleVerifyPwdOtp} className="space-y-3">
-                      <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs p-3 rounded-lg font-bold">
-                        ✓ קוד אימות נשלח בהצלחה! אנא בדוק את תיבת הדואר והזן אותו מטה.
+                    <form onSubmit={handleVerifyPwdOtp} className="space-y-2.5 w-full sm:w-auto shrink-0">
+                      <div className="text-[9.5px] text-emerald-700 font-bold text-center bg-emerald-50 rounded px-2 py-1 border border-emerald-100">
+                        קוד נשלח! בדוק והקלד אותו מטה:
                       </div>
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="flex items-center gap-2">
                         <input
                           type="text"
                           maxLength={6}
                           value={pwdOtpCode}
                           onChange={(e) => setPwdOtpCode(e.target.value)}
-                          placeholder="קוד בן 6 ספרות"
-                          className="px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm font-bold text-slate-800 tracking-wider text-center"
+                          placeholder="6 ספרות"
+                          className="px-2.5 py-1.5 bg-white border border-slate-250 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-xs font-black tracking-widest text-slate-800 text-center w-24"
                           required
                         />
                         <button
                           type="submit"
                           disabled={isPwdVerifyLoading}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-50"
                         >
-                          {isPwdVerifyLoading ? 'מאמת...' : 'אמת קוד והצג סיסמה'}
+                          {isPwdVerifyLoading ? 'מאמת...' : 'אמת קוד'}
                         </button>
                       </div>
                     </form>
                   )}
                 </div>
               ) : (
-                <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 space-y-4">
+                <div className="bg-emerald-50/20 p-5 rounded-xl border border-emerald-250/50 space-y-4">
                   <div className="flex items-center gap-2 text-emerald-800">
                     <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    <span className="text-xs font-black">האימות עבר בהצלחה! הסיסמה הישנה גלויה כעת.</span>
+                    <span className="text-xs font-black">אימות הקוד עבר בהצלחה! הסיסמה רשימה להזנה חדשה.</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center bg-white p-4 rounded-xl border border-emerald-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center bg-white p-4 rounded-xl border border-emerald-100/60 shadow-sm">
                     <div>
-                      <span className="block text-[10px] uppercase text-slate-400 font-bold mb-0.5">סיסמה ישנה/נוכחית במערכת</span>
-                      <code className="text-sm font-mono font-black text-rose-600 bg-rose-50 px-2 py-1 rounded">
-                        {settings.managerPassword || '1234'}
-                      </code>
+                      <span className="block text-[10px] text-slate-400 font-bold mb-0.5">סיסמה נוכחית רשומה בקופה:</span>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs font-mono font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                          {showManagerOldPass ? (settings.managerPassword || '1234') : '••••'}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => setShowManagerOldPass(!showManagerOldPass)}
+                          className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
+                          title={showManagerOldPass ? "הסתר סיסמה" : "הצג סיסמה"}
+                        >
+                          {showManagerOldPass ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
                     </div>
-                    <div className="sm:col-span-2 text-xs text-slate-400 leading-normal">
-                      סיסמה זו משמשת כעת לכניסה למערכת. היא תתעדכן ברגע שתשמור את הסיסמה החדשה מטה.
+                    <div className="sm:col-span-2 text-[11px] text-slate-400 leading-relaxed">
+                      סיסמה זו משמשת לכניסה לפנל הניהול. פנל הניהול יהפוך לפעיל עם המפתח החדש ברגע שישמר בטופס להלן.
                     </div>
                   </div>
 
                   <form onSubmit={handleSaveNewPassword} className="space-y-4 my-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">הזן סיסמה חדשה</label>
-                        <input
-                          type="text"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="מינימום 4 תווים"
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-bold text-slate-800"
-                          required
-                        />
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700">סיסמה חדשה מעודכנת</label>
+                        <div className="relative">
+                          <input
+                            type={showNewPass ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="לפחות 4 תווים"
+                            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-205 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-xs font-bold text-slate-800 text-right"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPass(!showNewPass)}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
+                            title={showNewPass ? "הסתר סיסמה" : "הצג סיסמה"}
+                          >
+                            {showNewPass ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">אמת/אשר את הסיסמה החדשה</label>
-                        <input
-                          type="text"
-                          value={confirmNewPassword}
-                          onChange={(e) => setConfirmNewPassword(e.target.value)}
-                          placeholder="הקלד סיסמה שנית"
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-sm font-bold text-slate-800"
-                          required
-                        />
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700">אישור / אמת סיסמה חדשה</label>
+                        <div className="relative">
+                          <input
+                            type={showNewPass ? "text" : "password"}
+                            value={confirmNewPassword}
+                            onChange={(e) => setConfirmNewPassword(e.target.value)}
+                            placeholder="הקלד שנית"
+                            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-205 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-xs font-bold text-slate-800 text-right"
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center pt-2 border-t border-emerald-100">
+                    <div className="flex justify-between items-center pt-3 border-t border-emerald-100">
                       <button
                         type="button"
                         onClick={() => {
@@ -2403,13 +2471,13 @@ export default function App() {
                           setNewPassword('');
                           setConfirmNewPassword('');
                         }}
-                        className="text-xs text-slate-400 hover:text-slate-600 font-bold"
+                        className="text-slate-400 hover:text-slate-600 text-xs font-semibold cursor-pointer"
                       >
-                        ביטול
+                        ביטול וחזרה למצב נעול
                       </button>
                       <button
                         type="submit"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-5 rounded-xl shadow transition-all cursor-pointer text-xs"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-1.5 px-4 rounded-lg shadow-sm cursor-pointer transition-all"
                       >
                         שמור סיסמה חדשה
                       </button>
@@ -2418,7 +2486,6 @@ export default function App() {
                 </div>
               )}
             </div>
-
           </section>
         )}
 
