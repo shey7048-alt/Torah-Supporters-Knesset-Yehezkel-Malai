@@ -27,7 +27,8 @@ import {
   AlertTriangle,
   MinusCircle,
   TrendingUp,
-  RotateCcw
+  RotateCcw,
+  Server
 } from 'lucide-react';
 import { ClothesItem, SaleLog, SystemSettings, SizesMap } from './types';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -123,6 +124,10 @@ export default function App() {
   // Local settings editing states to prevent input lag/stutters on keypress
   const [localManagerEmail, setLocalManagerEmail] = useState<string>('');
   const [localLowStockAlertActive, setLocalLowStockAlertActive] = useState<boolean>(true);
+  const [localSmtpHost, setLocalSmtpHost] = useState<string>('');
+  const [localSmtpPort, setLocalSmtpPort] = useState<number>(587);
+  const [localSmtpUser, setLocalSmtpUser] = useState<string>('');
+  const [localSmtpPass, setLocalSmtpPass] = useState<string>('');
 
   // Date picker states for Sales Log export
   const [exportStartDate, setExportStartDate] = useState<string>('');
@@ -166,6 +171,10 @@ export default function App() {
     if (settings) {
       setLocalManagerEmail(settings.managerEmail || '');
       setLocalLowStockAlertActive(settings.lowStockAlertActive ?? true);
+      setLocalSmtpHost(settings.smtpHost || '');
+      setLocalSmtpPort(settings.smtpPort ?? 587);
+      setLocalSmtpUser(settings.smtpUser || '');
+      setLocalSmtpPass(settings.smtpPass || '');
     }
   }, [settings]);
 
@@ -287,7 +296,15 @@ export default function App() {
       const res = await fetch(getApiUrl('/api/send-auth-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailToUse })
+        body: JSON.stringify({ 
+          email: emailToUse,
+          customSmtp: settings.smtpHost ? {
+            host: settings.smtpHost,
+            port: settings.smtpPort,
+            user: settings.smtpUser,
+            pass: settings.smtpPass
+          } : undefined
+        })
       });
       if (res.ok) {
         setOtpSent(true);
@@ -370,7 +387,13 @@ export default function App() {
               sizeName, 
               currentQty: newQty, 
               totalStock,
-              managerEmail: settings.managerEmail
+              managerEmail: settings.managerEmail,
+              customSmtp: settings.smtpHost ? {
+                host: settings.smtpHost,
+                port: settings.smtpPort,
+                user: settings.smtpUser,
+                pass: settings.smtpPass
+              } : undefined
             })
           })
           .then(async (res) => {
@@ -475,7 +498,13 @@ export default function App() {
               sizeName, 
               currentQty: newQty, 
               totalStock,
-              managerEmail: settings.managerEmail
+              managerEmail: settings.managerEmail,
+              customSmtp: settings.smtpHost ? {
+                host: settings.smtpHost,
+                port: settings.smtpPort,
+                user: settings.smtpUser,
+                pass: settings.smtpPass
+              } : undefined
             })
           })
           .then(async (res) => {
@@ -775,11 +804,15 @@ export default function App() {
         ...settings,
         managerEmail: localManagerEmail.trim(),
         lowStockAlertActive: localLowStockAlertActive,
+        smtpHost: localSmtpHost.trim(),
+        smtpPort: Number(localSmtpPort),
+        smtpUser: localSmtpUser.trim(),
+        smtpPass: localSmtpPass.trim(),
         hasSeededItems: settings.hasSeededItems ?? true
       };
       await setDoc(doc(db, 'settings', 'config'), updatedSettings);
       setLogoError(false);
-      triggerToast('הגדרות המיתוג והתראות המייל עודכנו!', 'success');
+      triggerToast('הגדרות המיתוג, התראות המייל ושרת ה-SMTP עודכנו!', 'success');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'settings/config');
       triggerToast('שגיאה בשמירת ההגדרות', 'error');
@@ -807,7 +840,13 @@ export default function App() {
           sizeName: "M", 
           currentQty: 3, 
           totalStock: 3,
-          managerEmail: settings.managerEmail
+          managerEmail: settings.managerEmail,
+          customSmtp: settings.smtpHost ? {
+            host: settings.smtpHost,
+            port: settings.smtpPort,
+            user: settings.smtpUser,
+            pass: settings.smtpPass
+          } : undefined
         })
       });
       if (res.ok) {
@@ -830,7 +869,15 @@ export default function App() {
       const res = await fetch(getApiUrl('/api/send-auth-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailToUse })
+        body: JSON.stringify({ 
+          email: emailToUse,
+          customSmtp: settings.smtpHost ? {
+            host: settings.smtpHost,
+            port: settings.smtpPort,
+            user: settings.smtpUser,
+            pass: settings.smtpPass
+          } : undefined
+        })
       });
       if (res.ok) {
         setIsPwdOtpSent(true);
@@ -2115,6 +2162,69 @@ export default function App() {
                   </label>
                   <span className="text-xs block text-slate-400">
                     כאשר תיבה זו מסומנת, המערכת תיגש לשרת שליחת המיילים בעת רכישות.
+                  </span>
+                </div>
+              </div>
+
+              {/* SMTP configuration options form fields */}
+              <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <Server className="h-4 w-4 text-amber-600" />
+                    <span>הגדרות שרת דואר יוצא (SMTP) בתוכנה</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
+                    כדי שלא תצטרכו להגדיר משתני סביבה בקוד או בפריסה, באפשרותכם להזין כאן פעם אחת בלבד את הגדרות ה-SMTP של תיבת המייל והיא תישמר באופן בטוח בתוך מסד הנתונים שלכם.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">שרת (SMTP Host)</label>
+                    <input
+                      type="text"
+                      value={localSmtpHost}
+                      onChange={(e) => setLocalSmtpHost(e.target.value)}
+                      placeholder="למשל: smtp.gmail.com"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">פורט (SMTP Port)</label>
+                    <input
+                      type="number"
+                      value={localSmtpPort || ''}
+                      onChange={(e) => setLocalSmtpPort(e.target.value === '' ? 587 : Number(e.target.value))}
+                      placeholder="למשל: 587 או 465"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">אימייל השולח / משתמש (SMTP User)</label>
+                    <input
+                      type="text"
+                      value={localSmtpUser}
+                      onChange={(e) => setLocalSmtpUser(e.target.value)}
+                      placeholder="למשל: tt.email.sender@gmail.com"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">סיסמה או סיסמת אפליקציה (SMTP Password)</label>
+                    <input
+                      type="password"
+                      value={localSmtpPass}
+                      onChange={(e) => setLocalSmtpPass(e.target.value)}
+                      placeholder="הזן סיסמת אפליקציה של 16 תווים"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-xs font-semibold text-slate-800 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 bg-amber-50/50 p-3 rounded-lg border border-amber-200/40 flex items-start gap-1.5 leading-relaxed">
+                  <span className="text-amber-700 font-bold">💡 טיפ חשוב ל-Gmail:</span>
+                  <span>
+                    כדי שגוגל יאפשר שליחה מהתיבה שלכם, הפעילו בחשבון Google הראשי שלכם <strong>"אימות דו-שלבי"</strong>, ואז צרו <strong>"סיסמת אפליקציה" (App Password)</strong> באגף האבטחה. המערכת תפיק לכם קוד ייעודי בן 16 אותיות באנגלית - העתיקו אותו והדביקו אותו כאן!
                   </span>
                 </div>
               </div>

@@ -97,13 +97,20 @@ const defaultSettings: SystemSettings = {
   alertEmailSentFor: []
 };
 
+interface CustomSMTPOptions {
+  host?: string;
+  port?: number;
+  user?: string;
+  pass?: string;
+}
+
 // Lazy initialize Nodemailer Transporter with adaptive configuration
-function getMailTransporter() {
-  const user = (process.env.EMAIL_USER || process.env.SMTP_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com').trim();
-  const pass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').trim();
-  const host = (process.env.EMAIL_HOST || 'smtp.gmail.com').trim();
-  const port = parseInt(process.env.EMAIL_PORT || '587');
-  const service = (process.env.EMAIL_SERVICE || '').trim();
+function getMailTransporter(custom?: CustomSMTPOptions) {
+  const user = (custom?.user || process.env.EMAIL_USER || process.env.SMTP_USER || '').trim();
+  const pass = (custom?.pass || process.env.EMAIL_PASS || process.env.SMTP_PASS || '').trim();
+  const host = (custom?.host || process.env.EMAIL_HOST || 'smtp.gmail.com').trim();
+  const port = parseInt(String(custom?.port || process.env.EMAIL_PORT || '587'), 10);
+  const service = (host.toLowerCase().includes('gmail.com') ? 'gmail' : (process.env.EMAIL_SERVICE || '').trim());
 
   if (!user || !pass) {
     // Return a console logging dummy implementation when keys are absent
@@ -141,12 +148,19 @@ function getMailTransporter() {
 }
 
 // Function to send modern email alert when stock reaches min limit
-async function sendStockAlertEmail(item: ClothesItem, sizeName: string, currentQty: number, totalStock: number, managerEmail: string) {
+async function sendStockAlertEmail(
+  item: ClothesItem, 
+  sizeName: string, 
+  currentQty: number, 
+  totalStock: number, 
+  managerEmail: string,
+  custom?: CustomSMTPOptions
+) {
   if (!managerEmail) {
     return;
   }
 
-  const transporter = getMailTransporter();
+  const transporter = getMailTransporter(custom);
   const subject = `⚠️ התראת חוסר מלאי: ${item.name} (מידה ${sizeName})`;
 
   const emailHtml = `
@@ -227,7 +241,7 @@ async function sendStockAlertEmail(item: ClothesItem, sizeName: string, currentQ
 
   try {
     await transporter.sendMail({
-      from: `"ניהול מלאי כנסת יחזקאל" <${process.env.EMAIL_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com'}>`,
+      from: `"ניהול מלאי כנסת יחזקאל" <${custom?.user || process.env.EMAIL_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com'}>`,
       to: managerEmail,
       subject,
       html: emailHtml,
@@ -243,13 +257,13 @@ async function sendStockAlertEmail(item: ClothesItem, sizeName: string, currentQ
 
 // Stateless SMTP alarm proxy to hide keys
 app.post('/api/send-alert', async (req, res) => {
-  const { item, sizeName, currentQty, totalStock, managerEmail } = req.body;
+  const { item, sizeName, currentQty, totalStock, managerEmail, customSmtp } = req.body;
   try {
-    await sendStockAlertEmail(item, sizeName, currentQty, totalStock, managerEmail);
+    await sendStockAlertEmail(item, sizeName, currentQty, totalStock, managerEmail, customSmtp);
     res.json({ success: true });
   } catch (err: any) {
     console.error("Failed to dispatcher alert SMTP mail:", err);
-    res.status(500).json({ error: `שגיאה בשליחת מייל הבדיקה: ${err.message || err}. וודא כי פרטי ה-SMTP (EMAIL_USER & EMAIL_PASS) מוגדרים כהלכה בלוח הסודות.` });
+    res.status(500).json({ error: `שגיאה בשליחת מייל הבדיקה: ${err.message || err}. וודא כי פרטי ה-SMTP מוגדרים כהלכה בתוכנה.` });
   }
 });
 
@@ -258,7 +272,7 @@ const verificationCodes = new Map<string, { code: string; expiresAt: number }>()
 
 // Endpoint to send a 6-digit OTP code to the requested email
 app.post('/api/send-auth-code', async (req, res) => {
-  const { email } = req.body;
+  const { email, customSmtp } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'כתובת דייר לקבלת קוד נדרשת' });
   }
@@ -270,7 +284,7 @@ app.post('/api/send-auth-code', async (req, res) => {
   verificationCodes.set(email.toLowerCase().trim(), { code, expiresAt });
 
   try {
-    const transporter = getMailTransporter();
+    const transporter = getMailTransporter(customSmtp);
     const subject = `🔑 קוד חד-פעמי לכניסה למערכת: ${code}`;
     const emailHtml = `
       <!DOCTYPE html>
@@ -307,7 +321,7 @@ app.post('/api/send-auth-code', async (req, res) => {
     `;
 
     await transporter.sendMail({
-      from: `"ניהול מלאי כנסת יחזקאל" <${process.env.EMAIL_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com'}>`,
+      from: `"ניהול מלאי כנסת יחזקאל" <${customSmtp?.user || process.env.EMAIL_USER || 'mmsqnyhwlhdrmkyrwtknstyhzql@gmail.com'}>`,
       to: email,
       subject,
       html: emailHtml,

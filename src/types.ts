@@ -41,6 +41,10 @@ export interface SystemSettings {
   alertEmailSentFor: string[]; // itemIds that already notified to prevent spamming
   managerPassword?: string;
   hasSeededItems?: boolean;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPass?: string;
 }
 
 export interface DashboardStats {
