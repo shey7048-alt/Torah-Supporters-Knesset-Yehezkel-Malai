@@ -56,11 +56,17 @@ service cloud.firestore {
 
     function isValidSystemSettings(data) {
       return data.keys().hasAll(['customLogoUrl', 'managerEmail', 'lowStockAlertActive', 'alertEmailSentFor'])
-        && data.keys().size() <= 6
+        && data.keys().size() <= 15
         && data.customLogoUrl is string && data.customLogoUrl.size() <= 1000
         && data.managerEmail is string && data.managerEmail.size() <= 200
         && data.lowStockAlertActive is bool
-        && data.alertEmailSentFor is list;
+        && data.alertEmailSentFor is list
+        && (!('managerPassword' in data) || data.managerPassword is string)
+        && (!('hasSeededItems' in data) || data.hasSeededItems is bool)
+        && (!('smtpHost' in data) || data.smtpHost is string)
+        && (!('smtpPort' in data) || data.smtpPort is number)
+        && (!('smtpUser' in data) || data.smtpUser is string)
+        && (!('smtpPass' in data) || data.smtpPass is string);
     }
 
     // ---------- COLLECTION RULE SETS ----------
