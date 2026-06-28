@@ -56,8 +56,16 @@ const getApiUrl = (endpoint: string): string => {
       return `${trimmed}${endpoint}`;
     }
   }
-  if (isElectronOrLocalFile) {
-    const fallbackProdUrl = 'https://ais-pre-yrb6u7pglhgu5zwfsfabqw-327994117025.europe-west2.run.app';
+
+  const fallbackProdUrl = 'https://ais-pre-yrb6u7pglhgu5zwfsfabqw-327994117025.europe-west2.run.app';
+
+  // If the frontend is hosted on an external static domain (like Vercel) rather than localhost or Cloud Run,
+  // route all API requests to the Cloud Run server.
+  const isExternalHost = !window.location.hostname.includes('localhost') && 
+                         !window.location.hostname.includes('127.0.0.1') && 
+                         !window.location.hostname.includes('.run.app');
+
+  if (isElectronOrLocalFile || isExternalHost) {
     return `${fallbackProdUrl}${endpoint}`;
   }
   return endpoint;
@@ -119,6 +127,8 @@ export default function App() {
 
   // Category addition helper
   const [newCategoryName, setNewCategoryName] = useState<string>('');
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editCategoryNameVal, setEditCategoryNameVal] = useState<string>('');
 
   // Toast System
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
@@ -1018,6 +1028,29 @@ export default function App() {
     }
   };
 
+  // Edit category name handler
+  const handleEditCategory = async (oldName: string, newName: string) => {
+    const cleanOld = oldName.trim();
+    const cleanNew = newName.trim();
+    if (!cleanNew || cleanOld === cleanNew) return;
+    if (categories.includes(cleanNew)) {
+      triggerToast('קטגוריה בשם זה כבר קיימת במערכת', 'warning');
+      return;
+    }
+    const updatedCategories = categories.map(c => c === cleanOld ? cleanNew : c).sort((a, b) => a.localeCompare(b, 'he'));
+    try {
+      await setDoc(doc(db, 'settings', 'config'), {
+        ...settings,
+        categories: updatedCategories,
+        hasSeededItems: settings.hasSeededItems ?? true
+      });
+      triggerToast(`שם הקטגוריה עודכן ל-"${cleanNew}"!`, 'success');
+    } catch (err) {
+      console.error(err);
+      triggerToast('שגיאה בעדכון שם הקטגוריה', 'error');
+    }
+  };
+
   // Delete category handler
   const handleDeleteCategory = async (catToDelete: string) => {
     if (catToDelete === 'אחר') return;
@@ -1807,7 +1840,11 @@ export default function App() {
                 const shouldShowImage = item.imageUrl && !hasImageFailed;
 
                 return (
-                  <div key={item.id} className="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(148,163,184,0.12)] hover:shadow-[0_12px_30px_-4px_rgba(148,163,184,0.2)] transition-all duration-300 hover:-translate-y-1 flex flex-col overflow-hidden relative group">
+                  <div 
+                    key={item.id} 
+                    onClick={() => openItemModal(item)}
+                    className="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(148,163,184,0.12)] hover:shadow-[0_12px_30px_-4px_rgba(148,163,184,0.2)] transition-all duration-300 hover:-translate-y-1 flex flex-col overflow-hidden relative group cursor-pointer"
+                  >
                     
                     {/* Upper image and metadata badge */}
                     <div className="h-52 bg-slate-50 relative overflow-hidden flex items-center justify-center border-b border-slate-100">
@@ -1879,13 +1916,26 @@ export default function App() {
                       </div>
 
                       {/* Interactive size matrix with gold touches */}
-                      <div className="border-t border-b border-dashed border-slate-200/80 py-3.5">
+                      <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="border-t border-b border-dashed border-slate-200/80 py-3.5"
+                      >
                         <span className="text-[11px] font-extrabold text-slate-500 block mb-2 text-right">יתרת מלאי ועדכון מהיר לפי מידה:</span>
                         <div className="grid grid-cols-4 gap-2 max-h-44 overflow-y-auto pr-0.5 lg:grid-cols-4">
                           {(Object.entries(item.sizes) as [string, number][]).map(([szName, qty]) => {
                             const isEditing = editingSizeQty?.itemId === item.id && editingSizeQty?.sizeName === szName;
                             return (
-                              <div key={szName} className="border border-slate-100 rounded-xl p-2 flex flex-col items-center justify-between bg-white shadow-sm hover:border-amber-400/50 transition-all duration-150 group/size relative">
+                              <div 
+                                key={szName} 
+                                onClick={() => {
+                                  if (!isEditing) {
+                                    setEditingSizeQty({ itemId: item.id, sizeName: szName });
+                                    setEditQtyValue(qty.toString());
+                                  }
+                                }}
+                                className="border border-slate-100 rounded-xl p-2 flex flex-col items-center justify-between bg-white shadow-sm hover:border-amber-400/50 transition-all duration-150 group/size relative cursor-pointer"
+                                title="לחץ להזנה ידנית"
+                              >
                                 <span className="text-[10px] font-bold text-slate-500 block text-center truncate w-full" title={szName}>{szName}</span>
                                 {isEditing ? (
                                   <input
@@ -1894,6 +1944,7 @@ export default function App() {
                                     className="w-14 text-center text-xs font-black my-1 border border-amber-400 rounded bg-amber-50 text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500 py-0.5"
                                     value={editQtyValue}
                                     onChange={(e) => setEditQtyValue(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
                                     autoFocus
                                     onBlur={() => {
                                       if (editQtyValue !== 'DISCARD') {
@@ -1915,26 +1966,27 @@ export default function App() {
                                   />
                                 ) : (
                                   <span 
-                                    onClick={() => {
-                                      setEditingSizeQty({ itemId: item.id, sizeName: szName });
-                                      setEditQtyValue(qty.toString());
-                                    }}
-                                    className={`text-xs font-black my-1 cursor-pointer hover:bg-amber-50 hover:text-amber-800 rounded px-1 transition-all ${qty === 0 ? 'text-rose-500' : qty <= 2 ? 'text-amber-600 font-black' : 'text-slate-850'}`}
-                                    title="לחץ להזנה ידנית"
+                                    className={`text-xs font-black my-1 rounded px-1 transition-all ${qty === 0 ? 'text-rose-500' : qty <= 2 ? 'text-amber-600 font-black' : 'text-slate-850'}`}
                                   >
                                     {qty} יח'
                                   </span>
                                 )}
                                 <div className="flex gap-1 w-full justify-center">
                                   <button 
-                                    onClick={() => handleQuickStockChange(item, szName, -1)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleQuickStockChange(item, szName, -1);
+                                    }}
                                     className="w-5 h-5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 text-slate-500 hover:text-rose-600 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
                                     title="הפחת 1 יח'"
                                   >
                                     -
                                   </button>
                                   <button 
-                                    onClick={() => handleQuickStockChange(item, szName, 1)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleQuickStockChange(item, szName, 1);
+                                    }}
                                     className="w-5 h-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200/60 text-slate-500 hover:text-emerald-700 rounded-md flex items-center justify-center text-xs font-black cursor-pointer transition-all duration-100 active:scale-90"
                                     title="הוסף 1 יח'"
                                   >
@@ -1956,16 +2008,22 @@ export default function App() {
                           </span>
                         </div>
 
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1.55 select-none">
                           <button
-                            onClick={() => openItemModal(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openItemModal(item);
+                            }}
                             className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:text-amber-400 hover:bg-slate-900 flex items-center justify-center transition-all cursor-pointer border border-slate-200/60 hover:border-slate-800 shadow-sm"
                             title="עריכת דגם"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteItem(item.id, item.name)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteItem(item.id, item.name);
+                            }}
                             className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-all cursor-pointer border border-slate-200/60 hover:border-red-200 shadow-sm"
                             title="מחיקת דגם"
                           >
@@ -2733,19 +2791,71 @@ export default function App() {
               <div className="text-right">
                 <span className="block text-xs font-bold text-slate-400 mb-2">קטגוריות קיימות</span>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                  {categories.map(c => (
-                    <div key={c} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
-                      <span className="text-xs font-bold text-slate-700">{c}</span>
-                      {c !== 'אחר' && (
-                        <button
-                          onClick={() => handleDeleteCategory(c)}
-                          className="text-slate-400 hover:text-red-500 cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                  {categories.map(c => {
+                    const isEditingThisCat = editingCategory === c;
+                    return (
+                      <div key={c} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 gap-2">
+                        {isEditingThisCat ? (
+                          <input
+                            type="text"
+                            value={editCategoryNameVal}
+                            onChange={(e) => setEditCategoryNameVal(e.target.value)}
+                            onBlur={() => {
+                              handleEditCategory(c, editCategoryNameVal);
+                              setEditingCategory(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleEditCategory(c, editCategoryNameVal);
+                                setEditingCategory(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingCategory(null);
+                              }
+                            }}
+                            autoFocus
+                            className="bg-white border border-amber-400 rounded px-2 py-0.5 text-xs font-bold text-slate-800 flex-1 focus:outline-none"
+                          />
+                        ) : (
+                          <span 
+                            onClick={() => {
+                              if (c !== 'אחר') {
+                                setEditingCategory(c);
+                                setEditCategoryNameVal(c);
+                              }
+                            }}
+                            className={`text-xs font-bold text-slate-700 cursor-pointer hover:text-amber-600 flex-1 transition-colors`}
+                            title={c !== 'אחר' ? "לחץ לעריכת שם" : undefined}
+                          >
+                            {c}
+                          </span>
+                        )}
+                        
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          {c !== 'אחר' && !isEditingThisCat && (
+                            <button
+                              onClick={() => {
+                                setEditingCategory(c);
+                                setEditCategoryNameVal(c);
+                              }}
+                              className="text-slate-400 hover:text-amber-500 cursor-pointer"
+                              title="עריכת שם"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </button>
+                          )}
+                          {c !== 'אחר' && (
+                            <button
+                              onClick={() => handleDeleteCategory(c)}
+                              className="text-slate-400 hover:text-red-500 cursor-pointer"
+                              title="מחיקה קבועה"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
